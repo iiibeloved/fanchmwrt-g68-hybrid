@@ -3,7 +3,7 @@
 """FanchmWrt 上游包清单基准对比 / 冲突守护。
 
 每次构建前，以 FanchmWrt 上游「默认已选中的包」+「全部可构建包元数据」为基准，
-检查本仓库的 builtin-list（待映射的 566 包）与 configs/g68-hybrid.config：
+检查本仓库的 builtin-list（待映射的 566 包）与 configs/g68-fanchm.config：
 
   DUPLICATE         上游默认已选中同名包        -> 注释（上游优先）
   PROVIDES_CONFLICT 本包 PROVIDES 命中上游占用  -> 注释（例如 dnsmasq-full 提供 dnsmasq）
@@ -218,7 +218,7 @@ def main():
     ap.add_argument("--index", action="append", default=[], help="feeds/*.index glob，可重复")
     ap.add_argument("--makefile-dir", action="append", default=[], help="上游 package 源码目录，可重复")
     ap.add_argument("--builtin-list", help="待映射的 builtin-list 清单")
-    ap.add_argument("--hybrid-config", help="configs/g68-hybrid.config")
+    ap.add_argument("--hybrid-config", help="configs/g68-fanchm.config")
     ap.add_argument("--out-dir", default="package-guard-out")
     ap.add_argument("--json", dest="json_path", help="JSON 报告路径")
     ap.add_argument("--md", dest="md_path", help="Markdown 报告路径")

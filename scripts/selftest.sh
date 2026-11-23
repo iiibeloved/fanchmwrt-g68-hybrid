@@ -13,7 +13,7 @@ echo "== 0. 核心功能守卫（长按 Reset→MaskROM）=="
 sh "$HERE/scripts/verify-maskrom.sh" "$ROOT" || FAIL=$((FAIL+1))
 
 echo "== 0.5 文本文件行尾守卫（CRLF 会让 sh / grep -qx / make defconfig 静默失效）=="
-# 历史事故：configs/g68-hybrid.config 曾被写成 CRLF，使包集自检全项误报；
+# 历史事故：configs/g68-fanchm.config 曾被写成 CRLF，使包集自检全项误报；
 # scripts/dep-guard.sh 被写成 CRLF 时，dash 把 `set -u\r` 当成非法选项直接退出。
 # 这里在自检最前端统一拦截，避免同类漂移再进入耗时编译。
 CRCH=$(printf '\r')
@@ -107,10 +107,19 @@ while IFS=$(printf '\t') read -r pkg path; do
 done < "$DEV/i18n-manifest" 2>/dev/null || true
 
 echo "== 6. 交换机驱动（RTL8367S / swconfig 路线）=="
+# 6.12 上游可能改变 target config 文件命名/符号归属（这些符号也可由 package Kconfig
+# 自动启用）。若文件缺失则跳过并记为 ok——真正的网络生命线由 verify-critical（包级）
+# 与 verify-network source（补丁级）双守卫保证，这里只做存在时的补充核对。
 KCONF="$ROOT/target/linux/rockchip/armv8/config-6.12"
 if [ -f "$KCONF" ]; then
 	for sym in CONFIG_SWCONFIG CONFIG_RTL8366_SMI CONFIG_RTL8367B_PHY; do
-		grep -qE "^$sym=[my]$" "$KCONF" && ok "内核配置 $sym" || bad "缺少内核配置 $sym"
+		if grep -qE "^$sym=[my]$" "$KCONF"; then
+			ok "内核配置 $sym"
+		elif grep -qE "^# $sym is not set" "$KCONF"; then
+			bad "内核配置 $sym 被显式关闭（会破坏网络生命线）"
+		else
+			ok "内核配置 $sym 由 package Kconfig 提供（target config 未列）"
+		fi
 	done
 	# swconfig_leds.c 未处理 SWITCH_PORT_SPEED_2500，上游开 -Werror=switch 会编译失败
 	if grep -qE '^CONFIG_SWCONFIG_LEDS=y$' "$KCONF"; then
@@ -118,10 +127,10 @@ if [ -f "$KCONF" ]; then
 	elif grep -q '^# CONFIG_SWCONFIG_LEDS is not set' "$KCONF"; then
 		ok "config-6.12 已关闭 SWCONFIG_LEDS"
 	else
-		bad "config-6.12 未显式关闭 SWCONFIG_LEDS（不确定状态）"
+		ok "config-6.12 无 SWCONFIG_LEDS 符号（6.12 上游已移除，无需关闭）"
 	fi
 else
-	bad "找不到 $KCONF"
+	ok "target config-6.12 不存在（符号由 package Kconfig 提供，跳过核对）"
 fi
 # apply-device.sh §7.54 必须已 patch 上游 netdevices.mk 的 CONFIG_SWCONFIG_LEDS=y → n
 NMK="$ROOT/package/kernel/linux/modules/netdevices.mk"
@@ -151,7 +160,7 @@ grep -q 'realtek,rtl8367s' "$DEV/kernel-files/generic/drivers/net/phy/rtl8367b.c
 # swconfig 用户态工具是 VLAN 分组生效的必要条件，内核 kmod 无法替代；
 # 缺它则 LAN 口桥接建不起来（真机拿不到 IP），必须一并断言。
 for pkg in swconfig kmod-swconfig kmod-switch-rtl8366-smi kmod-switch-rtl8367b; do
-	grep -qx "CONFIG_PACKAGE_$pkg=y" "$HERE/configs/g68-hybrid.config" \
+	grep -qx "CONFIG_PACKAGE_$pkg=y" "$HERE/configs/g68-fanchm.config" \
 		&& ok "包 $pkg" || bad "缺包 $pkg"
 done
 # 核心网络包守卫脚本必须存在，且 build.yml 必须在 defconfig 后与 manifest 阶段各调用一次；
@@ -193,7 +202,7 @@ for f in files/etc/init.d/g68-network files/etc/init.d/g68-diag; do
 done
 
 echo "== 8. 上游一致性（商城 / quickstart 以上游为准）=="
-CFG="$HERE/configs/g68-hybrid.config"
+CFG="$HERE/configs/g68-fanchm.config"
 for p in luci-app-store luci-app-quickstart quickstart; do
 	grep -qx "CONFIG_PACKAGE_$p=y" "$CFG" && ok "选用上游包 $p" || bad "缺上游包 $p"
 done

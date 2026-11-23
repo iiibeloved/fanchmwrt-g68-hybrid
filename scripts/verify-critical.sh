@@ -3,7 +3,7 @@
 #  核心网络功能包守卫（defconfig 后 + 最终 manifest，双阶段 fail-fast）
 #
 #  为什么需要两阶段：
-#    selftest.sh / hw-audit.sh 只检查 configs/g68-hybrid.config 这个"输入"，
+#    selftest.sh / hw-audit.sh 只检查 configs/g68-fanchm.config 这个"输入"，
 #    但真正的包集由 make defconfig 展开，上游 feed 漂移可能让关键包被静默丢弃。
 #    历史上的 LAN 拿不到 IP 就是因为用户态 swconfig 未进入最终镜像。
 #    因此：

@@ -3,7 +3,7 @@
 #  硬件级内容审核（编译前，prepare 阶段执行）
 #
 #  目的：避免「编译通过但真机不可用」。从 dts 提取硬件关键字，与
-#  configs/g68-hybrid.config（软件包）、device/kernel-config（内核配置）、
+#  configs/g68-fanchm.config（软件包）、device/kernel-config（内核配置）、
 #  device/uboot/static/*_defconfig（u-boot）交叉比对，输出：
 #      已支持 / 缺失 / 显式豁免
 #  关键项（DSA 交换机 / adc-keys / xpcs / 存储分区）缺失 → exit 1 阻断构建。
@@ -13,7 +13,7 @@
 set -eu
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 DEV="$HERE/device"
-CFG="$HERE/configs/g68-hybrid.config"
+CFG="$HERE/configs/g68-fanchm.config"
 KCFG="$DEV/kernel-config"
 EX="$DEV/hw-exemptions.txt"
 DTS="$DEV/kernel-dts/rk3568-nsy-g68-plus.dts"
