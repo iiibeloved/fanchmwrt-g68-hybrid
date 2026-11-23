@@ -216,8 +216,8 @@ else
 	ok "i18n-manifest 未启用商城覆盖"
 fi
 # 上游跟随：upstream-watch 必须跟随 FanchmWrt 分支并在变化时自动构建
-grep -q 'ISTOREOS_BRANCH: fanchmwrt-24.10' "$HERE/.github/workflows/upstream-watch.yml" \
-	&& ok "upstream-watch 跟随 fanchmwrt-24.10" || bad "upstream-watch 未跟随上游分支"
+grep -q 'FANCHM_BRANCH: fanchmwrt-25.12.6' "$HERE/.github/workflows/upstream-watch.yml" \
+	&& ok "upstream-watch 跟随 fanchmwrt-25.12.6" || bad "upstream-watch 未跟随上游分支"
 grep -q 'workflows/build.yml/dispatches' "$HERE/.github/workflows/upstream-watch.yml" \
 	&& ok "上游变化自动触发构建" || bad "缺上游变化自动触发"
 
