@@ -1,0 +1,10 @@
+# G68 板载 RTL8367S 交换机 —— swconfig 传统驱动（与 immortalwrt standalone 真机验证一致）
+# 说明：内核侧符号由对应 kmod 包的 KCONFIG 自动强制为 =m，
+# 这里显式声明是为了构建前自检 / 硬件审计能核对驱动确实会被编入。
+#   kmod-swconfig            → CONFIG_SWCONFIG
+#   kmod-switch-rtl8366-smi  → CONFIG_RTL8366_SMI
+#   kmod-switch-rtl8367b     → CONFIG_RTL8367B_PHY
+CONFIG_SWCONFIG=m
+# CONFIG_SWCONFIG_LEDS is not set
+CONFIG_RTL8366_SMI=m
+CONFIG_RTL8367B_PHY=m
