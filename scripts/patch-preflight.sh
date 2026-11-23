@@ -90,18 +90,35 @@ touches() { # touches <patch> -> 0 表示涉及
 	return 1
 }
 
+patch_files() { # patch_files <patch> -> 逐个打印 -p1 后的相对路径
+	grep -E '^--- a/' "$1" 2>/dev/null | sed 's|^--- a/||; s|[[:space:]].*$||'
+}
+
 apply_series() { # apply_series <目录> <标签>
-	_dir="$1"; _tag="$2"; _n=0; _fail=0
+	_dir="$1"; _tag="$2"; _n=0; _fail=0; _skip=0
 	[ -d "$_dir" ] || return 0
 	for p in $(ls "$_dir"/*.patch 2>/dev/null | sort); do
 		touches "$p" || continue
+		# 该补丁若同时改其它文件，按需补下（保证 hunk 上下文与真实构建一致）；
+		# 补不下来就跳过整条并告警 —— 宁可预检不完整，也不要误报失败。
+		_ok=1
+		for f in $(patch_files "$p"); do
+			[ -s "$W/$f" ] && continue
+			fetch "$f" >/dev/null 2>&1 || true
+			[ -s "$W/$f" ] || { _ok=0; break; }
+		done
+		if [ "$_ok" != "1" ]; then
+			_skip=$((_skip+1))
+			warn "跳过 $_tag/$(basename "$p")（涉及无法获取的源文件，预检不覆盖该补丁）"
+			continue
+		fi
 		_n=$((_n+1))
 		if ! ( cd "$W" && patch -p1 -N -F0 --no-backup-if-mismatch < "$p" >/dev/null 2>&1 ); then
 			_fail=$((_fail+1))
 			bad "上游补丁与 $TAG 源文件不匹配: $_tag/$(basename "$p")（与本仓补丁无关，需上游修）"
 		fi
 	done
-	[ "$_n" -gt 0 ] && ok "上游 $_tag 补丁已应用 $_n 个（失败 $_fail）"
+	[ "$_n" -gt 0 ] && ok "上游 $_tag 补丁已应用 $_n 个（失败 $_fail，跳过 $_skip）"
 	return 0
 }
 
