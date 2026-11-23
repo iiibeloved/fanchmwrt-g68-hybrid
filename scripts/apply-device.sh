@@ -149,11 +149,28 @@ if ! grep -q 'ROOTFS_DATA_PARTSIZE' "$GEN"; then
 	fi
 fi
 
-# ---------- 7.5) 自定义 files/（Argon 必应壁纸等）----------
+# ---------- 7.5) 自定义 files/（菜单资产 / uci-defaults / 中文覆盖数据）----------
 if [ -d "$DEV/files" ]; then
 	mkdir -p "$ROOT/files"
 	cp -a "$DEV/files/." "$ROOT/files/"
 	say "自定义文件已放置到 $ROOT/files/（$(cd "$DEV/files" && find . -type f | wc -l) 个文件）"
+
+	# ---------- 7.51) 可执行位修正（必须显式做，不能依赖 cp -a）----------
+	# 本仓库在 Windows 上开发，git 的 core.filemode=false 使所有文件一律存成 100644；
+	# CI 在 Linux checkout 后 `cp -a` 会原样保留 644，于是：
+	#   /etc/init.d/g68-i18n   -> `enable` 直接 Permission denied（开机中文永不生效）
+	#   /usr/bin/g68-i18n      -> init.d 里 `[ -x ]` 判假，整条中文链路静默失效
+	#   /etc/uci-defaults/*    -> 上游以 `.` source，能跑；但统一 0755 与官方一致，避免后续变更踩坑
+	# 这里按目录语义显式修正，保证在任何 checkout 环境结果一致。
+	for d in "$ROOT/files/usr/bin" "$ROOT/files/etc/init.d" "$ROOT/files/etc/uci-defaults"; do
+		[ -d "$d" ] || continue
+		find "$d" -maxdepth 1 -type f -exec chmod 0755 {} + 2>/dev/null || true
+	done
+	for f in "$ROOT/files/usr/bin/g68-i18n" "$ROOT/files/etc/init.d/g68-i18n"; do
+		[ -f "$f" ] || continue
+		[ -x "$f" ] || die "可执行位修正失败：$f 仍不可执行（中文覆盖会失效）"
+	done
+	say "可执行位已修正：/usr/bin/g68-i18n、/etc/init.d/g68-i18n、/etc/uci-defaults/*（0755）"
 fi
 
 # ---------- 7.52) 板级网络映射（独立 board.d 脚本，不改上游 02_network）----------

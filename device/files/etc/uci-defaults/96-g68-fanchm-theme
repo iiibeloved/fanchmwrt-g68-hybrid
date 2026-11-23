@@ -1,0 +1,26 @@
+#!/bin/sh
+# =============================================================================
+#  默认外观锁定为 FanchmWrt 原生主题
+#
+#  本固件明确不使用 iStoreOS 风格（无 QuickStart、无商城）也不安装 Argon，
+#  但仍显式把 LuCI 默认主题指向 fanchmwrt，避免：
+#    - 上游主题包 uci-defaults 顺序变化导致回落到 bootstrap；
+#    - 用户误装其他主题后无法回到出厂外观（本脚本只做首次默认，不强制覆盖用户选择）。
+#  仅在静态目录存在时设置；目录名随上游变化时静默跳过，不会写坏 LuCI。
+# =============================================================================
+[ -d /www/luci-static/fanchmwrt ] || exit 0
+
+changed=0
+cur=$(uci -q get luci.main.mediaurlbase)
+if [ "$cur" != "/luci-static/fanchmwrt" ]; then
+	uci -q set luci.main.mediaurlbase='/luci-static/fanchmwrt'
+	changed=1
+fi
+# 主题条目（下拉列表显示的键名）由上游 31_luci-theme-fanchmwrt 写入；
+# 上游若改名/移除该脚本，这里补回，保证「系统→系统→语言和界面」里仍能选到。
+if [ -z "$(uci -q get luci.themes.FanchmWrt)" ]; then
+	uci -q set luci.themes.FanchmWrt='/luci-static/fanchmwrt'
+	changed=1
+fi
+[ "$changed" = "1" ] && uci -q commit luci
+exit 0

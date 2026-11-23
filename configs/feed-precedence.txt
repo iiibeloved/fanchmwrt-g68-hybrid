@@ -1,0 +1,12 @@
+# 同名包生效来源（pkg  优先 feed）
+#
+# 用途：
+#   - scripts/feed-sources.sh 按本表删除其他 feed 的同名链接并从指定 feed 重装；
+#   - scripts/dep-guard.sh 按本表校验「生效来源」是否唯一。
+# 文件缺失会让 feed-sources.sh 直接 exit 1（构建在 defconfig 后中断），
+# 所以即使没有需要改源的包，也必须保留本文件（可只含注释）。
+#
+# 当前唯一需要改源的包：
+#   FanchmWrt 官方 packages 的 sing-box 版本滞后于 small；
+#   luci-app-homeproxy 要求 sing-box >= 1.15.0_alpha10。
+sing-box small

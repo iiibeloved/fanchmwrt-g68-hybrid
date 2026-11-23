@@ -6,9 +6,6 @@ luci-app-filetransfer	usr/lib/lua/luci/model/cbi/filetransfer.lua
 luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/main.htm
 luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/manage.htm
 luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/log.htm
-luci-app-istoreenhance	usr/lib/lua/luci/controller/istoreenhance.lua
-luci-app-istoreenhance	usr/lib/lua/luci/model/cbi/istoreenhance.lua
-luci-app-istoreenhance	usr/lib/lua/luci/view/istoreenhance_status.htm
 luci-app-wolplus	usr/lib/lua/luci/controller/wolplus.lua
 luci-app-wolplus	usr/lib/lua/luci/model/cbi/wolplus.lua
 luci-app-wolplus	usr/lib/lua/luci/view/wolplus/index.htm

@@ -1,6 +1,6 @@
 #!/bin/sh
 # =============================================================================
-#  NSY G68-PLUS 板级网络映射（补充 iStoreOS 上游 02_network 未收录的板型）
+#  NSY G68-PLUS 板级网络映射（补充 FanchmWrt 上游 02_network 未收录的板型）
 #
 #  board_detect 会按字母序 source /etc/board.d/*，本文件名排在 02_network 之后，
 #  因此只在本文件内覆盖 G68 的映射，不修改上游 02_network 本体 ——

@@ -253,19 +253,11 @@
 		regulator-boot-on;
 	};
 
-	gmac0_xpcsclk: xpcs-gmac0-clock {
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
-		clock-output-names = "clk_gmac0_xpcs_mii";
-		#clock-cells = <0>;
-	};
-
-	gmac1_xpcsclk: xpcs-gmac1-clock {
-		compatible = "fixed-clock";
-		clock-frequency = <125000000>;
-		clock-output-names = "clk_gmac1_xpcs_mii";
-		#clock-cells = <0>;
-	};
+	/* 注意：gmac0_xpcsclk / gmac1_xpcsclk 两个 125MHz 固定时钟由
+	 * device/kernel-patches/911-*.patch 注入 rk3568.dtsi / rk356x.dtsi，
+	 * 这里 **不能** 重新定义同名 label —— dtc 会以
+	 *   ERROR (duplicate_label)
+	 * 直接编译失败。板级只引用 &gmac1_xpcsclk（见下方 &gmac1）。 */
 
 	adc_keys: adc-keys {
 		compatible = "adc-keys";

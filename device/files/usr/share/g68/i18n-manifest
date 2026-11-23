@@ -6,9 +6,6 @@ luci-app-filetransfer	usr/lib/lua/luci/model/cbi/filetransfer.lua
 luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/main.htm
 luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/manage.htm
 luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/log.htm
-luci-app-istoreenhance	usr/lib/lua/luci/controller/istoreenhance.lua
-luci-app-istoreenhance	usr/lib/lua/luci/model/cbi/istoreenhance.lua
-luci-app-istoreenhance	usr/lib/lua/luci/view/istoreenhance_status.htm
 luci-app-wolplus	usr/lib/lua/luci/controller/wolplus.lua
 luci-app-wolplus	usr/lib/lua/luci/model/cbi/wolplus.lua
 luci-app-wolplus	usr/lib/lua/luci/view/wolplus/index.htm
@@ -24,8 +21,5 @@ luci-app-control-weburl	usr/lib/lua/luci/view/weburl/weburl.htm
 luci-app-timecontrol	www/luci-static/resources/view/timecontrol/basic.js
 luci-app-timecontrol	www/luci-static/resources/view/timecontrol/log.js
 luci-app-timecontrol	usr/share/luci/menu.d/luci-app-timecontrol.json
-# 商城（luci-app-store）以上游 iStoreOS 官方版本为准，不做中文覆盖
-#luci-app-store	usr/lib/lua/luci/controller/store.lua
-#luci-app-store	usr/lib/lua/luci/view/store/main.htm
 luci-app-emmc-health	www/luci-static/resources/view/emmc-health.js
 luci-app-lan-scanner	www/luci-static/resources/view/lan-scanner.js

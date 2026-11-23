@@ -3,7 +3,8 @@ name: maskrom-guard
 # 核心功能「长按 Reset→MaskROM」的存在性守卫。
 # 任何对 device/ scripts/ 的提交都会在 1 分钟内被检查：
 #   - 不允许出现 u-boot patch 投递（必须 overlay-only）
-#   - overlay 四个文件必须包含 spl_board_init / 0xEF08A53C / 0xfdc20200 / ADC 通道 / dtb 登记
+#   - overlay 四个文件必须包含 setup_boot_mode / 0xEF08A53C / 0xfdc20200 / ADC 通道 / dtb 登记
+#     （2025.10 起 setup_boot_mode() 由上游 board.c 调用，rk3568.c 不再含 spl_board_init）
 #   - 板级 defconfig 必须启用 ADC/SPL_ADC
 # 失败即代表核心功能被破坏，禁止合并到 main（配合分支保护）。
 

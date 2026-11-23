@@ -5,14 +5,31 @@
 #  中文覆盖文件复制到 rootfs 实际位置。
 #  这样：
 #   - 应用未安装 → 不产生幽灵菜单/孤儿文件；
-#   - 用户从 iStoreOS 商城安装应用后，重启（或手动执行 g68-i18n apply）即恢复中文。
+#   - 用户安装/卸载应用后，重启（或手动执行 g68-i18n apply）即同步中文覆盖。
 # =============================================================================
 OVERLAY=/usr/share/g68/i18n-overlay
 MANIFEST=/usr/share/g68/i18n-manifest
 INFO=/usr/lib/opkg/info
+APKDB=/lib/apk/db/installed
 
 pkg_installed() {
-	[ -f "$INFO/$1.control" ] || [ -f "$INFO/$1.list" ] || opkg list-installed 2>/dev/null | grep -q "^$1 "
+	if [ -f "$INFO/$1.control" ] || [ -f "$INFO/$1.list" ]; then
+		return 0
+	fi
+	# FanchmWrt 25.12 使用 apk（24.10 及更早为 opkg）。两者都要识别，
+	# 否则新基座上会一律判为“未安装”：中文永远不投递，还会误删已有覆盖文件。
+	# 优先直接读 apk 安装库（纯文本，每包一段、含 "P:<名字>" 行）：
+	# 不依赖 apk 命令行，apk-tools 2.x/3.x 子命令改名（info → query）也照样成立。
+	if [ -f "$APKDB" ]; then
+		grep -qx "P:$1" "$APKDB" && return 0
+	fi
+	if command -v apk >/dev/null 2>&1; then
+		apk info -e "$1" >/dev/null 2>&1 && return 0
+	fi
+	if command -v opkg >/dev/null 2>&1; then
+		opkg list-installed 2>/dev/null | grep -q "^$1 " && return 0
+	fi
+	return 1
 }
 
 apply_all() {

@@ -1,14 +1,21 @@
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c	2025-04-28 11:13:47.793613847 +0800
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c	2025-04-28 11:54:12.293437935 +0800
-@@ -14,6 +14,7 @@
+Subject: [PATCH] net: stmmac: dwmac-rk: skip XPCS autoneg for fixed-link
+
+G68 uses fixed-link on both GMACs (no in-band AN against the RTL8367S CPU
+port).  Force BMCR_SPEED1000|BMCR_FULLDPLX instead of running XPCS
+auto-negotiation, which otherwise leaves the link down.  Part of the
+LAN/WAN lifeline.
+
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -13,6 +13,7 @@
+ #include <linux/phy.h>
  #include <linux/phy/phy.h>
  #include <linux/of_net.h>
- #include <linux/gpio.h>
 +#include <linux/of_mdio.h>
  #include <linux/module.h>
  #include <linux/of.h>
- #include <linux/of_gpio.h>
-@@ -178,44 +179,58 @@ static int xpcs_soft_reset(struct rk_pri
+ #include <linux/platform_device.h>
+@@ -177,44 +178,58 @@
  
  static int xpcs_setup(struct rk_priv_data *bsp_priv, int mode)
  {

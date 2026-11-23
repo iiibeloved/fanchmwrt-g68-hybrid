@@ -10,8 +10,8 @@ switches to the negotiated speed for 10/100/1000M.
 Change-Id: Iab9dd6ee61a35bf89fd3a0721f5d398de501a7ec
 Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
- .../net/ethernet/stmicro/stmmac/dwmac-rk.c    | 228 +++++++++++++++++-
- 1 file changed, 217 insertions(+), 11 deletions(-)
+ .../net/ethernet/stmicro/stmmac/dwmac-rk.c    | 202 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 198 insertions(+), 4 deletions(-)
 
 --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
@@ -21,9 +21,9 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  #include <linux/phy.h>
 +#include <linux/phy/phy.h>
  #include <linux/of_net.h>
- #include <linux/gpio.h>
  #include <linux/module.h>
-@@ -30,6 +31,8 @@ struct rk_gmac_ops {
+ #include <linux/of.h>
+@@ -28,6 +29,8 @@
  	void (*set_to_rgmii)(struct rk_priv_data *bsp_priv,
  			     int tx_delay, int rx_delay);
  	void (*set_to_rmii)(struct rk_priv_data *bsp_priv);
@@ -32,7 +32,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  	void (*set_rgmii_speed)(struct rk_priv_data *bsp_priv, int speed);
  	void (*set_rmii_speed)(struct rk_priv_data *bsp_priv, int speed);
  	void (*set_clock_selection)(struct rk_priv_data *bsp_priv, bool input,
-@@ -40,7 +43,7 @@ struct rk_gmac_ops {
+@@ -40,7 +43,7 @@
  };
  
  static const char * const rk_clocks[] = {
@@ -41,7 +41,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  };
  
  static const char * const rk_rmii_clocks[] = {
-@@ -50,6 +53,7 @@ static const char * const rk_rmii_clocks
+@@ -50,6 +53,7 @@
  enum rk_clocks_index {
  	RK_ACLK_MAC = 0,
  	RK_PCLK_MAC,
@@ -49,7 +49,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  	RK_MAC_CLK_TX,
  	RK_CLK_MAC_SPEED,
  	RK_MAC_CLK_RX,
-@@ -81,6 +85,7 @@ struct rk_priv_data {
+@@ -81,6 +85,7 @@
  
  	struct regmap *grf;
  	struct regmap *php_grf;
@@ -57,7 +57,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  };
  
  #define HIWORD_UPDATE(val, mask, shift) \
-@@ -93,6 +98,128 @@ struct rk_priv_data {
+@@ -93,6 +98,128 @@
  	(((tx) ? soc##_GMAC_TXCLK_DLY_ENABLE : soc##_GMAC_TXCLK_DLY_DISABLE) | \
  	 ((rx) ? soc##_GMAC_RXCLK_DLY_ENABLE : soc##_GMAC_RXCLK_DLY_DISABLE))
  
@@ -183,10 +183,10 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
 +	return ret;
 +}
 +
- #define PX30_GRF_GMAC_CON1		0x0904
- 
- /* PX30_GRF_GMAC_CON1 */
-@@ -1021,6 +1148,7 @@ static const struct rk_gmac_ops rk3399_o
+ #define RK_GRF_MACPHY_CON0		0xb00
+ #define RK_GRF_MACPHY_CON1		0xb04
+ #define RK_GRF_MACPHY_CON2		0xb08
+@@ -1054,6 +1181,7 @@
  #define RK3568_GRF_GMAC1_CON1		0x038c
  
  /* RK3568_GRF_GMAC0_CON1 && RK3568_GRF_GMAC1_CON1 */
@@ -194,7 +194,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  #define RK3568_GMAC_PHY_INTF_SEL_RGMII	\
  		(GRF_BIT(4) | GRF_CLR_BIT(5) | GRF_CLR_BIT(6))
  #define RK3568_GMAC_PHY_INTF_SEL_RMII	\
-@@ -1036,6 +1164,46 @@ static const struct rk_gmac_ops rk3399_o
+@@ -1069,6 +1197,46 @@
  #define RK3568_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 8)
  #define RK3568_GMAC_CLK_TX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 0)
  
@@ -241,7 +241,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  static void rk3568_set_to_rgmii(struct rk_priv_data *bsp_priv,
  				int tx_delay, int rx_delay)
  {
-@@ -1108,6 +1276,8 @@ static void rk3568_set_gmac_speed(struct
+@@ -1129,6 +1297,8 @@
  static const struct rk_gmac_ops rk3568_ops = {
  	.set_to_rgmii = rk3568_set_to_rgmii,
  	.set_to_rmii = rk3568_set_to_rmii,
@@ -250,7 +250,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  	.set_rgmii_speed = rk3568_set_gmac_speed,
  	.set_rmii_speed = rk3568_set_gmac_speed,
  	.regs_valid = true,
-@@ -1580,7 +1750,7 @@ static int gmac_clk_enable(struct rk_pri
+@@ -1667,7 +1837,7 @@
  	return 0;
  }
  
@@ -259,10 +259,10 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  {
  	struct regulator *ldo = bsp_priv->regulator;
  	int ret;
-@@ -1679,6 +1849,18 @@ static struct rk_priv_data *rk_gmac_setu
- 							"rockchip,grf");
- 	bsp_priv->php_grf = syscon_regmap_lookup_by_phandle(dev->of_node,
- 							    "rockchip,php-grf");
+@@ -1781,6 +1951,19 @@
+ 		}
+ 	}
+ 
 +	bsp_priv->xpcs = syscon_regmap_lookup_by_phandle(dev->of_node,
 +							 "rockchip,xpcs");
 +	if (!IS_ERR(bsp_priv->xpcs)) {
@@ -275,10 +275,11 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
 +		if (ret)
 +			dev_err(dev, "phy_init error\n");
 +	}
- 
++
  	if (plat->phy_node) {
  		bsp_priv->integrated_phy = of_property_read_bool(plat->phy_node,
-@@ -1756,11 +1938,19 @@ static int rk_gmac_powerup(struct rk_pri
+ 								 "phy-is-integrated");
+@@ -1857,11 +2040,19 @@
  		dev_info(dev, "init for RMII\n");
  		bsp_priv->ops->set_to_rmii(bsp_priv);
  		break;
@@ -299,7 +300,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  	if (ret) {
  		gmac_clk_enable(bsp_priv, false);
  		return ret;
-@@ -1781,7 +1971,7 @@ static void rk_gmac_powerdown(struct rk_
+@@ -1882,7 +2073,7 @@
  
  	pm_runtime_put_sync(&gmac->pdev->dev);
  
@@ -308,7 +309,7 @@ Signed-off-by: David Wu <david.wu@rock-chips.com>
  	gmac_clk_enable(gmac, false);
  }
  
-@@ -1802,6 +1992,9 @@ static void rk_fix_speed(void *priv, uns
+@@ -1903,6 +2094,9 @@
  		if (bsp_priv->ops->set_rmii_speed)
  			bsp_priv->ops->set_rmii_speed(bsp_priv, speed);
  		break;

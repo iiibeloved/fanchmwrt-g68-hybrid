@@ -38,7 +38,17 @@ CRIT="swconfig kmod-swconfig kmod-switch-rtl8366-smi kmod-switch-rtl8367b dnsmas
 CELLULAR="adb-enablemodem comgt comgt-directip comgt-ncm kmod-qmi_wwan_m kmod-qmi_wwan_q kmod-usb-net-cdc-mbim kmod-usb-net-qmi-wwan kmod-usb-serial-ipw kmod-usb-serial-option kmod-usb-serial-qualcomm kmod-usb-serial-wwan libmbim libqmi libqrtr-glib luci-app-3ginfo-lite luci-app-modem luci-app-sms-tool luci-i18n-modem-zh-cn luci-proto-3g luci-proto-mbim luci-proto-modemmanager luci-proto-ncm luci-proto-qmi modemmanager qmi-utils quectel-CM-5G quectel-timesync sms-tool umbim uqmi wwan"
 SMSC_NET="kmod-phy-smsc kmod-usb-net-smsc95xx"
 # 杂交新增目标：FanchmWrt 行为管理（用户要求的杂交价值）。缺失则杂交失去意义，两阶段都断言。
-FCM="fwx fwxd libfwx_common shortcut-fe luci-theme-fanchmwrt fullconenat-nft"
+# 注意包名：KernelPackage/fwx → kmod-fwx；KernelPackage/shortcut-fe → kmod-shortcut-fe；
+#           KernelPackage/nft-fullcone → kmod-nft-fullcone（写错会被 defconfig 静默丢弃）。
+# luci-app-fwx-dashboard 是 UI 入口，缺它则内核模块在但界面不可见。
+FCM="kmod-fwx fwxd libfwx_common kmod-shortcut-fe kmod-nft-fullcone luci-theme-fanchmwrt luci-app-fwx-dashboard"
+# 风格约束（用户决策 2026-11-23）：本固件使用 FanchmWrt 原生风格，
+# 不使用 iStoreOS 的 QuickStart 首页 / 应用商城 / Argon 主题。
+# 这些包多来自 small/store feed，上游漂移或 package-guard 去重都可能把它们带回，
+# 因此与蜂窝清单同级做双阶段拦截（config 出现 =y 或 manifest 出现即失败）。
+# luci-app-fwx-app-center 是 FanchmWrt 自家的云端应用商城（cloud.fanchmwrt.com
+# 下载并安装 ipk/apk），上游 DEFAULT_PACKAGES.router 同样不含它，一并禁止。
+STYLE_FORBIDDEN="quickstart luci-app-quickstart luci-i18n-quickstart-zh-cn luci-app-store luci-app-fwx-app-center luci-i18n-fwx-app-center-zh-cn luci-theme-argon luci-app-argon-config luci-i18n-argon-config-zh-cn"
 FAIL=0
 ok()  { printf '  [OK]   %s\n' "$*"; }
 bad() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL+1)); }
@@ -103,6 +113,26 @@ for p in $FCM; do
 		bad "行为管理包 $p 缺失（FanchmWrt 杂交功能不完整，禁止构建/发布）"
 	fi
 done
+
+echo
+echo "== [guard] 风格约束：FanchmWrt 原生（无 QuickStart / 商城 / Argon）=="
+# 与蜂窝守卫同语义：出现即失败（本项目明确不采用 iStoreOS 风格）
+for p in $STYLE_FORBIDDEN; do
+	case "$MODE" in
+		config)   pat="^CONFIG_PACKAGE_${p}=y$" ;;
+		manifest) pat="^${p} - " ;;
+	esac
+	if grep -qE "$pat" "$FILE"; then
+		bad "iStoreOS 风格包 $p 被引入（本固件使用 FanchmWrt 原生风格）"
+	else
+		ok "$p 未引入"
+	fi
+done
+# 正向：FanchmWrt 主题必须在（已在 FCM 清单断言，这里再确认风格落地）
+case "$MODE" in
+	config)   grep -qE '^CONFIG_PACKAGE_luci-theme-fanchmwrt=y$' "$FILE" && ok "默认主题 luci-theme-fanchmwrt" || bad "缺默认主题 luci-theme-fanchmwrt" ;;
+	manifest) grep -qE '^luci-theme-fanchmwrt - ' "$FILE" && ok "默认主题 luci-theme-fanchmwrt" || bad "产物缺默认主题 luci-theme-fanchmwrt" ;;
+esac
 
 echo
 if [ "$FAIL" -gt 0 ]; then

@@ -66,6 +66,16 @@ case "$MODE" in
 		need "$TARGET" "DTS xpcs 节点（XPCS 补丁消费）" '&xpcs'
 		# RTL8367S switch 节点（若上游 dts 结构变化丢失，交换芯片不识别）
 		need "$TARGET" "DTS RTL8367S 交换机节点" 'rtl8367s'
+		# 911 已把 gmac0/gmac1 的 125MHz xpcs 固定时钟注入 rk3568.dtsi / rk356x.dtsi；
+		# 板级若再定义同名 label，dtc 直接 ERROR (duplicate_label) —— 编译期才炸，
+		# 所以在投递前就拦下（历史：板级与补丁各定义一份）。
+		for l in gmac0_xpcsclk gmac1_xpcsclk; do
+			if grep -qE "^[[:space:]]*${l}:" "$TARGET"; then
+				bad "DTS 重复定义 $l（911 补丁已提供，dtc 会 duplicate_label 失败）"
+			else
+				ok "DTS 未重复定义 $l（时钟来自 911 补丁）"
+			fi
+		done
 		;;
 	*)
 		echo "::error::未知模式 $MODE（应为 source 或 dts）" >&2

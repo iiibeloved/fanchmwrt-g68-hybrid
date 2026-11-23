@@ -1,3 +1,5 @@
 .gen/
 *.log
 upstream.commit
+__pycache__/
+*.pyc

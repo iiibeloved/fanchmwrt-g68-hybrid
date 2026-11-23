@@ -62,6 +62,15 @@ done
 for p in 910 911 913 915; do
 	ls "$ROOT/target/linux/rockchip/patches-6.12/${p}-"*.patch >/dev/null 2>&1 && ok "关键补丁 ${p}-*" || bad "缺关键补丁 ${p}-*"
 done
+# 补丁能否真的打上，由 scripts/patch-preflight.sh 在 prepare 阶段验证（fuzz=0）。
+# 这里只守住"预检不能被绕过"：脚本存在且被 build.yml 挂载。
+if [ -f "$HERE/scripts/patch-preflight.sh" ]; then
+	ok "补丁预检脚本存在"
+else
+	bad "缺 scripts/patch-preflight.sh（上游补丁栈变化会在编译 40 分钟后才炸）"
+fi
+grep -q 'patch-preflight.sh' "$HERE/.github/workflows/build.yml" \
+	&& ok "build.yml 已挂载补丁预检" || bad "build.yml 未挂载 patch-preflight.sh"
 
 echo "== 3. 构建系统插入 =="
 grep -q "U-Boot/nsy-g68-plus-rk3568" "$UB/Makefile" && ok "U-Boot 目标定义" || bad "缺 U-Boot 目标定义"
@@ -81,8 +90,8 @@ else
 fi
 
 echo
-[ "$FAIL" -gt 0 ] && { echo "自检失败：$FAIL 项"; exit 1; }
-echo "自检全部通过 ✅"
+# 注意：此处只做阶段性判断，不打印“全部通过”——§4~§14 尚未执行。
+[ "$FAIL" -gt 0 ] && { echo "自检失败（前 1-3 节）：$FAIL 项"; exit 1; }
 
 echo "== 4. 自定义文件 / 中文覆盖投递 =="
 if [ -d "$DEV/files" ]; then
@@ -201,12 +210,22 @@ for f in files/etc/init.d/g68-network files/etc/init.d/g68-diag; do
 	[ -e "$ROOT/$f" ] && bad "仍存在 $f（应已移除）" || ok "已移除 $f"
 done
 
-echo "== 8. 上游一致性（商城 / quickstart 以上游为准）=="
+echo "== 8. 风格约束：FanchmWrt 原生（无 QuickStart / 商城 / Argon）=="
 CFG="$HERE/configs/g68-fanchm.config"
-for p in luci-app-store luci-app-quickstart quickstart; do
-	grep -qx "CONFIG_PACKAGE_$p=y" "$CFG" && ok "选用上游包 $p" || bad "缺上游包 $p"
+for p in quickstart luci-app-quickstart luci-i18n-quickstart-zh-cn luci-app-store \
+         luci-app-fwx-app-center luci-i18n-fwx-app-center-zh-cn \
+         luci-theme-argon luci-app-argon-config luci-i18n-argon-config-zh-cn; do
+	grep -qx "CONFIG_PACKAGE_$p=y" "$CFG" \
+		&& bad "$p 仍被选中（本固件使用 FanchmWrt 原生风格）" || ok "$p 未选中"
 done
-# 不允许本地固化商城/quickstart 的 LuCI 文件（必须随上游 feeds 变化）
+grep -qx 'CONFIG_PACKAGE_luci-theme-fanchmwrt=y' "$CFG" \
+	&& ok "默认主题 luci-theme-fanchmwrt" || bad "缺默认主题 luci-theme-fanchmwrt"
+# 不允许本地固化商城/quickstart 的 LuCI 文件（避免风格回流）
+# 出厂默认主题脚本：把 LuCI 媒体路径指向 fanchmwrt（目录存在时才生效，避免写坏 LuCI）
+THEME_SH="$DEV/files/etc/uci-defaults/96-g68-fanchm-theme"
+[ -f "$THEME_SH" ] && ok "96-g68-fanchm-theme 存在" || bad "缺 96-g68-fanchm-theme（默认主题可能回落 bootstrap）"
+grep -q '/luci-static/fanchmwrt' "$THEME_SH" 2>/dev/null \
+	&& ok "默认主题指向 /luci-static/fanchmwrt" || bad "默认主题脚本未指向 fanchmwrt"
 OVR=$(cd "$DEV/files" && find . -type f \( -path '*luci*store*' -o -path '*luci*quickstart*' \) 2>/dev/null | head -5 || true)
 [ -z "$OVR" ] && ok "无本地商城/quickstart 覆盖文件" || bad "存在本地覆盖: $OVR"
 # i18n manifest 不应启用商城覆盖（注释行不计）
@@ -221,32 +240,26 @@ grep -q 'FANCHM_BRANCH: fanchmwrt-25.12.6' "$HERE/.github/workflows/upstream-wat
 grep -q 'workflows/build.yml/dispatches' "$HERE/.github/workflows/upstream-watch.yml" \
 	&& ok "上游变化自动触发构建" || bad "缺上游变化自动触发"
 
-echo "== 9. quickstart / 网络向导 来源（官方 feeds 缺失 → small）=="
+echo "== 9. 第三方 feed（small）与同名包来源优先级 =="
 grep -q '^src-git small ' "$ROOT/feeds.conf" \
-	&& ok "feeds.conf 已声明 small 源" || bad "feeds.conf 缺 small 源（quickstart/向导 config 项会被丢弃）"
-for p in quickstart luci-app-quickstart luci-app-store luci-app-ddns-go; do
+	&& ok "feeds.conf 已声明 small 源" \
+	|| bad "feeds.conf 缺 small 源（ddns-go/openclash/passwall 等会被 defconfig 丢弃）"
+for p in luci-app-ddns-go luci-app-openclash luci-app-passwall luci-app-homeproxy; do
 	grep -qx "CONFIG_PACKAGE_$p=y" "$CFG" && ok "已选 $p" || bad "缺少 $p"
 done
-grep -qx 'CONFIG_PACKAGE_luci-app-netwizard=y' "$CFG" \
-	&& bad "设置向导（luci-app-netwizard）仍启用" || ok "设置向导已移除"
-grep -qx 'CONFIG_PACKAGE_luci-mod-dashboard=y' "$CFG" \
-	&& bad "管理面板（luci-mod-dashboard）仍启用" || ok "管理面板已移除"
-# 官方 feeds 自身不得已含 quickstart；若上游将来内置，则应改回官方来源并撤掉 small
-# 注意：只查官方 feed 目录，排除 small 自身，否则会把 small 当成官方来源
-if [ -d "$ROOT/feeds" ]; then
-	FOUND=""
-	for d in packages luci store third routing telephony; do
-		[ -d "$ROOT/feeds/$d" ] || continue
-		grep -rqs 'PKG_NAME:=quickstart' "$ROOT/feeds/$d" && FOUND="$d"
-	done
-	if [ -n "$FOUND" ]; then
-		bad "官方 feeds（$FOUND）已提供 quickstart（small 来源需复核为重复）"
-	else
-		ok "官方 feeds 不含 quickstart（来源 = small）"
-	fi
+# feed-sources.sh 在文件缺失时直接 exit 1（会中断 build job），必须存在且声明 sing-box 来源
+if [ -f "$HERE/configs/feed-precedence.txt" ]; then
+	ok "configs/feed-precedence.txt 存在"
+	grep -qE '^sing-box[[:space:]]+small$' "$HERE/configs/feed-precedence.txt" \
+		&& ok "sing-box 来源=small（HomeProxy 要求新版）" \
+		|| bad "feed-precedence 未声明 sing-box small（HomeProxy 会拿到旧版）"
 else
-	printf '  [INFO] feeds 尚未 update，跳过官方 feeds 内容检查\n'
+	bad "缺 configs/feed-precedence.txt（feed-sources.sh 会以 exit 1 中断构建）"
 fi
+grep -qx 'CONFIG_PACKAGE_luci-app-netwizard=y' "$CFG" \
+	&& bad "设置向导（luci-app-netwizard）仍启用" || ok "设置向导已移除（FanchmWrt 原生风格）"
+grep -qx 'CONFIG_PACKAGE_luci-mod-dashboard=y' "$CFG" \
+	&& bad "管理面板（luci-mod-dashboard）仍启用" || ok "管理面板已移除（FanchmWrt 原生风格）"
 
 echo "== 10. DNS 替换：dnsmasq-full 取代上游 dnsmasq（去重规则唯一例外）=="
 grep -qx 'CONFIG_PACKAGE_dnsmasq-full=y' "$CFG" && ok "已选 dnsmasq-full" || bad "缺少 dnsmasq-full"
@@ -307,6 +320,21 @@ echo "== 14. 编译期蜂窝能力整体移除（主动防线，fail-fast）=="
 # 全部为 'is not set'、且 SMSC 以太网 PHY 驱动仍保留。清单只在 verify-critical
 # 维护一份，避免两处漂移。上游/去重把任一蜂窝包带回即在此失败。
 sh "$HERE/scripts/verify-critical.sh" config "$CFG" || FAIL=$((FAIL+1))
+
+echo "== 15. FanchmWrt 原生 UI（fwx 应用套件）=="
+# 只装内核模块/守护进程而不装 fwx UI，行为管理在 LuCI 里不可见（杂交价值丢失）。
+# 清单对齐上游 include/target.mk 的 DEFAULT_PACKAGES.router（含 fastnat/traffic-stat，
+# 不含 app-center 商城 —— 后者在 §8 作为风格禁项拦截）。
+for p in luci-app-fwx-dashboard luci-app-fwx-appfilter luci-app-fwx-user \
+         luci-app-fwx-traffic-stat luci-app-fwx-fastnat luci-app-fwx-firewall \
+         luci-app-fwx-network luci-app-fwx-resources luci-app-fwx-wireless; do
+	grep -qx "CONFIG_PACKAGE_$p=y" "$CFG" && ok "已选 $p" || bad "缺少 $p（FanchmWrt 界面不完整）"
+done
+# 与 fwx 冲突的 OAF（iptables 时代的应用过滤）必须保持关闭
+for p in kmod-oaf appfilter luci-app-oaf; do
+	grep -qx "CONFIG_PACKAGE_$p=y" "$CFG" \
+		&& bad "$p 仍启用（与 kmod-fwx 的 netfilter hook 冲突）" || ok "$p 已关闭"
+done
 
 if [ "$FAIL" -gt 0 ]; then
 	echo "自检失败：$FAIL 项"

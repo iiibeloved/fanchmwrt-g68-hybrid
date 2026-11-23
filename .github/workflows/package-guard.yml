@@ -107,7 +107,7 @@ jobs:
             --index 'fanchmwrt/feeds/*.index' \
             --makefile-dir fanchmwrt/package \
             --makefile-dir fanchmwrt/feeds \
-            --builtin-list configs/builtin-list.txt \
+            $([ -f configs/builtin-list.txt ] && echo "--builtin-list configs/builtin-list.txt") \
             --hybrid-config configs/g68-fanchm.config \
             --out-dir package-guard-out \
             --json package-guard-out/report.json \
@@ -136,11 +136,12 @@ jobs:
         if: ${{ inputs.commit_result == true }}
         run: |
           set -eu
-          cp package-guard-out/builtin-list.txt configs/builtin-list.txt
           cp package-guard-out/g68-fanchm.config configs/g68-fanchm.config
+          [ -f package-guard-out/builtin-list.txt ] && cp package-guard-out/builtin-list.txt configs/builtin-list.txt || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add configs/builtin-list.txt configs/g68-fanchm.config
+          git add configs/g68-fanchm.config
+          [ -f configs/builtin-list.txt ] && git add configs/builtin-list.txt || true
           if git diff --cached --quiet; then echo "无可回写的变更"; exit 0; fi
           git commit -m "chore(packages): 以上游包清单为基准注释重复项 [skip ci]"
           # 并发保护：checkout 到回写之间远端可能已有新提交（例如 DTS 修复），

@@ -45,12 +45,24 @@ exempted(){ [ -f "$EX" ] && grep -qiE "^$1[[:space:]]" "$EX"; }
 # 可选：FanchmWrt 源码树（prepare 阶段存在），用于读取内核版本与校验补丁一致性
 ROOT="${HW_ROOT:-fanchmwrt}"
 KV=""
-if [ -f "$ROOT/include/kernel-6.6" ]; then
-	LV=$(sed -n 's/^LINUX_VERSION-6\.6 = //p' "$ROOT/include/kernel-6.6" | head -1)
-	[ -n "$LV" ] && KV="6.6$LV"
+# FanchmWrt 25.12 使用内核 6.12（历史上 hybrid 为 6.6，这里按基座锁定 6.12）
+# 版本明细文件由 include/kernel-version.mk 的 KERNEL_DETAILS_FILE 指定：
+#   $(GENERIC_PLATFORM_DIR)/kernel-$(KERNEL_PATCHVER) = target/linux/generic/kernel-6.12
+KVDET=""
+for f in "$ROOT/target/linux/generic/kernel-6.12" "$ROOT/include/kernel-6.12"; do
+	[ -f "$f" ] && { KVDET="$f"; break; }
+done
+if [ -n "$KVDET" ]; then
+	LV=$(sed -n 's/^LINUX_VERSION-6\.12 = //p' "$KVDET" | head -1)
+	[ -n "$LV" ] && KV="6.12$LV"
 fi
 if [ -z "$KV" ]; then
-	warn "未能读取 FanchmWrt 内核版本（$ROOT/include/kernel-6.6），版本相关判定降级为警告"
+	# 兼容内核版本文件名变化：直接读 target Makefile 的 KERNEL_PATCHVER
+	KP=$(sed -n 's/^KERNEL_PATCHVER:=//p' "$ROOT/target/linux/rockchip/Makefile" 2>/dev/null | head -1)
+	[ -n "$KP" ] && KV="$KP"
+fi
+if [ -z "$KV" ]; then
+	warn "未能读取 FanchmWrt 内核版本（target/linux/generic/kernel-6.12），版本相关判定降级为警告"
 fi
 ver_ge() { [ -n "$KV" ] && awk -v a="$KV" -v b="$1" 'BEGIN{split(a,x,".");split(b,y,".");for(i=1;i<=3;i++){if(x[i]+0>y[i]+0)exit 0;if(x[i]+0<y[i]+0)exit 1}exit 0}'; }
 patches_grep() { grep -lE "$1" "$DEV"/kernel-patches/*.patch 2>/dev/null || true; }
@@ -94,11 +106,11 @@ else
 	warn "dts 未发现 xpcs 节点"
 fi
 
-# 历史事故：912-combphy 与 FanchmWrt 6.6.144 冲突（hunk 1/4 FAILED），当时处理为「删除」而非修补。
-# 若再次出现 combphy 补丁，且内核版本 >= 6.6.144，说明重复投递，必须拦截。
+# 历史事故：912-combphy 与 24.10 基座（6.6.144）冲突（hunk 1/4 FAILED），当时处理为「删除」而非修补。
+# 若再次出现 combphy 补丁，且内核版本 >= 6.12.0，说明重复投递，必须拦截。
 COMPHY_PATCH=$(patches_grep 'naneng-combphy')
 if [ -n "$COMPHY_PATCH" ]; then
-	if [ -n "$KV" ] && ver_ge 6.6.144; then
+	if [ -n "$KV" ] && ver_ge 6.12.0; then
 		miss "检测到 combphy 补丁（$(basename "$COMPHY_PATCH" | head -1)），但内核 $KV 已内置 sgmii-mac-sel 支持 → 会再次 hunk 冲突，应删除该补丁"
 	else
 		warn "检测到 combphy 补丁，当前内核版本 ${KV:-未知}，需确认不会与上游冲突"
@@ -110,16 +122,16 @@ fi
 if dts_has 'sgmii-mac-sel'; then
 	if [ -n "$(patches_grep 'sgmii-mac-sel')" ]; then
 		ok "dts 使用 rockchip,sgmii-mac-sel，且由补丁提供"
-	elif [ -n "$KV" ] && ver_ge 6.6.144; then
+	elif [ -n "$KV" ] && ver_ge 6.12.0; then
 		# 注意：此处不能断言 FanchmWrt 已内置该属性。
-		# 912 被删除的依据只是「hunk 1/4 与 FanchmWrt 源码上下文冲突」，
+		# 912 被删除的依据只是「hunk 1/4 与 24.10 源码上下文冲突」，
 		# 而 hunk 2/3（parse_dt 新增属性读取）是能应用成功的 —— 说明 FanchmWrt
 		# 的 combphy 可能并没有 sgmii-mac-sel 支持。必须真机验证 2.5G 口：
 		#   ethtool eth1 | grep Speed   → 2500Mb/s 才证明链路成立；
-		#   若只有 1000Mb/s 或链路不通，需要按 FanchmWrt 6.6.144 源码重建 912 等价补丁。
-		warn "dts 使用 rockchip,sgmii-mac-sel，但无补丁提供，且 FanchmWrt $KV 是否内置未经证实 → 必须真机验证 gmac1 2.5G；必要时重建 912 适配补丁"
+		#   若只有 1000Mb/s 或链路不通，需要按 FanchmWrt 6.12 源码重建 912 等价补丁。
+		warn "dts 使用 rockchip,sgmii-mac-sel，但无补丁提供，且 FanchmWrt $KV 是否内置 sgmii-mac-sel 未经证实 → 必须真机验证 gmac1 2.5G；必要时重建 912 适配补丁"
 	elif [ -n "$KV" ]; then
-		miss "dts 使用 rockchip,sgmii-mac-sel，但内核 $KV < 6.6.144 且无补丁提供该属性"
+		miss "dts 使用 rockchip,sgmii-mac-sel，但内核 $KV < 6.12 且无补丁提供该属性"
 	else
 		warn "dts 使用 rockchip,sgmii-mac-sel，无法确认内核是否内置（版本未知）"
 	fi

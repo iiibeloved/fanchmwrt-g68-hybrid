@@ -62,6 +62,8 @@ jobs:
           fi
 
           echo "上游有变化（或 lock 为空），触发全量构建"
-          gh api -X POST "repos/$GITHUB_REPOSITORY/actions/workflows/build.yml/dispatches" \
-            -f ref=main -f 'inputs[stage]=full' -f 'inputs[publish]=true'
+          # 注意：不要用 `-f 'inputs[stage]=full'` —— gh api 的 -f 只做扁平键值，
+          # 括号不会展开成嵌套对象，GitHub 会忽略该字段；这里显式传 JSON 结构。
+          printf '%s' '{"ref":"main","inputs":{"stage":"full","publish":"true"}}' \
+            | gh api -X POST "repos/$GITHUB_REPOSITORY/actions/workflows/build.yml/dispatches" --input -
           echo "已触发"
