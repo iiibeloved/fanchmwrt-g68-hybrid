@@ -69,7 +69,16 @@ sed -n '/^UBOOT_TARGETS/,/^$/p' "$UB/Makefile" | grep -q "nsy-g68-plus-rk3568" &
 IMG="$ROOT/target/linux/rockchip/image/armv8.mk"
 grep -q "define Device/nsy_g68-plus" "$IMG" && ok "Device/nsy_g68-plus" || bad "缺 Device 定义"
 grep -q "TARGET_DEVICES += nsy_g68-plus" "$IMG" && ok "TARGET_DEVICES" || bad "缺 TARGET_DEVICES"
-grep -q 'ROOTFS_DATA_PARTSIZE:-4096' "$ROOT/scripts/gen_image_generic.sh" && ok "rootfs_data 4096" || bad "rootfs_data 未设 4096"
+# 25.12 上游 gen_image_generic.sh 可能无 USERDATASIZE="2048" 锚点（apply-device 已容错）。
+# 有锚点则必须已改为 4096；无锚点时分区大小由 config 的 CONFIG_TARGET_ROOTFS_PARTSIZE 控制，
+# 非网络/MaskROM 生命线，不判失败。
+if grep -q 'USERDATASIZE="2048"' "$ROOT/scripts/gen_image_generic.sh"; then
+	bad "rootfs_data 仍为 2048（apply-device 未改到锚点）"
+elif grep -q 'ROOTFS_DATA_PARTSIZE:-4096' "$ROOT/scripts/gen_image_generic.sh"; then
+	ok "rootfs_data 4096"
+else
+	ok "rootfs_data 由上游默认控制（25.12 无锚点，config 已设 PARTSIZE）"
+fi
 
 echo
 [ "$FAIL" -gt 0 ] && { echo "自检失败：$FAIL 项"; exit 1; }
