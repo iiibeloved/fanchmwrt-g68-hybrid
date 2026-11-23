@@ -138,10 +138,15 @@ fi
 GEN="$ROOT/scripts/gen_image_generic.sh"
 [ -f "$GEN" ] || die "找不到 $GEN"
 if ! grep -q 'ROOTFS_DATA_PARTSIZE' "$GEN"; then
-	sed -i 's/^USERDATASIZE="2048"$/USERDATASIZE="${ROOTFS_DATA_PARTSIZE:-4096}"/' "$GEN"
-	grep -q 'ROOTFS_DATA_PARTSIZE' "$GEN" \
-		|| die "gen_image_generic.sh 结构变化：未找到 USERDATASIZE=\"2048\""
-	say "gen_image_generic.sh: rootfs_data 默认 4096 MiB"
+	if grep -q '^USERDATASIZE="2048"$' "$GEN"; then
+		sed -i 's/^USERDATASIZE="2048"$/USERDATASIZE="${ROOTFS_DATA_PARTSIZE:-4096}"/' "$GEN"
+		say "gen_image_generic.sh: rootfs_data 默认 4096 MiB"
+	else
+		# 25.12 上游脚本结构变化（无 USERDATASIZE="2048" 锚点）。
+		# 分区大小已由 config 的 CONFIG_TARGET_ROOTFS_PARTSIZE 控制，
+		# 此项非网络/MaskROM 生命线，容错跳过，不影响功能。
+		say "警告: gen_image_generic.sh 无 USERDATASIZE 锚点（25.12 结构变化），跳过 rootfs_data 调整"
+	fi
 fi
 
 # ---------- 7.5) 自定义 files/（Argon 必应壁纸等）----------
