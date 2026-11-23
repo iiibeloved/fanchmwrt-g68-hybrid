@@ -55,8 +55,12 @@ grep -q "set_back_to_bootrom_dnl_flag" "$O/arch/arm/mach-rockchip/boot_mode.c" &
 grep -q "0xEF08A53C\|EF08A53C" "$O/arch/arm/mach-rockchip/boot_mode.c" && ok "boot_mode.c: BROM magic 0xEF08A53C" || bad "boot_mode.c 缺 magic"
 grep -q "RK_DNL_ADC_CHAN" "$O/arch/arm/mach-rockchip/boot_mode.c" && ok "boot_mode.c: ADC 通道可覆盖(默认 0)" || bad "boot_mode.c 缺 RK_DNL_ADC_CHAN"
 grep -q "0xfdc20200" "$O/arch/arm/mach-rockchip/boot_mode.c" && ok "boot_mode.c: 寄存器地址 0xfdc20200（自带兜底）" || bad "boot_mode.c 缺 0xfdc20200 兜底"
-grep -q "spl_board_init" "$O/arch/arm/mach-rockchip/rk3568/rk3568.c" && ok "rk3568.c: spl_board_init" || bad "rk3568.c 缺 spl_board_init"
-grep -q "setup_boot_mode" "$O/arch/arm/mach-rockchip/rk3568/rk3568.c" && ok "rk3568.c: 调 setup_boot_mode" || bad "rk3568.c 未调 setup_boot_mode"
+# 2025.10 起 setup_boot_mode() 的调用从 rk3568.c:spl_board_init 移到公共
+# board.c:board_late_init()（上游原生调用），rk3568.c 不再含该调用。
+# 因此守卫改为验证 MaskROM 逻辑本体：boot_mode.c 必须定义 setup_boot_mode()
+# 且含写 BROM 标志 + 复位路径；调用点由上游 board.c 保证（见下方注释）。
+grep -q "int setup_boot_mode" "$O/arch/arm/mach-rockchip/boot_mode.c" && ok "boot_mode.c: 定义 setup_boot_mode（MaskROM 入口，上游 board.c 调用）" || bad "boot_mode.c 未定义 setup_boot_mode"
+grep -q "do_reset" "$O/arch/arm/mach-rockchip/boot_mode.c" && ok "boot_mode.c: 按键触发后复位（进 MaskROM）" || bad "boot_mode.c 缺 do_reset"
 grep -q "obj-y += boot_mode.o" "$O/arch/arm/mach-rockchip/Makefile" && ok "Makefile: boot_mode.o 编入 SPL" || bad "Makefile 未把 boot_mode.o 编入 SPL"
 grep -q "rk3568-nsy-g68-plus.dtb" "$O/arch/arm/dts/Makefile" && ok "dts/Makefile: 登记 dtb" || bad "dts/Makefile 未登记 dtb"
 

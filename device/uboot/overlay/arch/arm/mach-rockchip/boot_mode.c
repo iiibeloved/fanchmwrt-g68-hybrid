@@ -14,18 +14,11 @@
 #include <linux/printk.h>
 
 /*
- * 长按复位键进入 MaskROM 的 boot-mode 寄存器地址。
- *
- * 设备实测（运行中 immortalwrt 固件：u-boot 反汇编 + debugfs regmap）：
- *   PMU_GRF 基址 0xfdc20000 + 0x200 (OS_REG0) = 0xfdc20200
- *   写入 BROM magic = 0xEF08A53C (BOOT_BROM_DOWNLOAD)
- *
- * 等价于 immortalwrt 的 patch 形式：地址在源码自带兜底，
- * 不依赖 defconfig / Kconfig 设置该宏（上游 Kconfig 与本项目 defconfig 均无 default）。
- * 若构建系统在别处已定义此宏，此处 #ifndef 不会覆盖。
- *
- * 注意：不要再加 "#if (CONFIG_ROCKCHIP_BOOT_MODE_REG == 0) 空桩" 守卫——
- * 该宏未设置时等于 0，会让整段复位键→MaskROM 逻辑被编译成空函数（静默失效）。
+ * 长按复位键进入 MaskROM：boot-mode 寄存器地址兜底。
+ * 设备实测 PMU_GRF 0xfdc20000 + 0x200(OS_REG0) = 0xfdc20200；
+ * 写 BROM magic 0xEF08A53C 后复位进入 MaskROM。
+ * 上游 Kconfig 的 ROCKCHIP_BOOT_MODE_REG 无默认值（未选=0），
+ * 原版 "#if (==0)" 空桩会让整段逻辑静默失效，故必须兜底。
  */
 #ifndef CONFIG_ROCKCHIP_BOOT_MODE_REG
 #define CONFIG_ROCKCHIP_BOOT_MODE_REG 0xfdc20200
@@ -90,13 +83,11 @@ __weak int rockchip_dnl_key_pressed(void)
 
 void rockchip_dnl_mode_check(void)
 {
-#if CONFIG_IS_ENABLED(ADC)
 	if (rockchip_dnl_key_pressed()) {
 		printf("download key pressed, entering download mode...");
 		set_back_to_bootrom_dnl_flag();
 		do_reset(NULL, 0, 0, NULL);
 	}
-#endif
 }
 
 int setup_boot_mode(void)
@@ -109,7 +100,6 @@ int setup_boot_mode(void)
 	boot_mode = readl(reg);
 	debug("%s: boot mode 0x%08x\n", __func__, boot_mode);
 
-#if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_TPL_BUILD)
 	/* Clear boot mode */
 	writel(BOOT_NORMAL, reg);
 
@@ -123,7 +113,6 @@ int setup_boot_mode(void)
 		env_set("preboot", "setenv preboot; ums mmc 0");
 		break;
 	}
-#endif
 
 	return 0;
 }
