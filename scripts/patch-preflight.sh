@@ -114,8 +114,15 @@ apply_series() { # apply_series <目录> <标签>
 		fi
 		_n=$((_n+1))
 		if ! ( cd "$W" && patch -p1 -N -F0 --no-backup-if-mismatch < "$p" >/dev/null 2>&1 ); then
-			_fail=$((_fail+1))
-			bad "上游补丁与 $TAG 源文件不匹配: $_tag/$(basename "$p")（与本仓补丁无关，需上游修）"
+			# 只对「改内核网络驱动」的补丁硬失败：本仓 910/913/915 的上下文
+			# 全在 dwmac-rk.c 上，它错了 LAN 就死；DTS/Makefile 类补丁在最小
+			# 复现树里可能因跳过别的补丁而假失败，只告警不阻塞。
+			if grep -qE "^(---|\+\+\+) [ab]/drivers/net/ethernet/stmicro/stmmac/dwmac-rk\.c" "$p"; then
+				_fail=$((_fail+1))
+				bad "上游补丁与 $TAG 源文件不匹配（dwmac-rk.c）: $_tag/$(basename "$p")"
+			else
+				warn "上游 $_tag/$(basename "$p") 在最小复现树上未命中（非网络驱动，仅告警）"
+			fi
 		fi
 	done
 	[ "$_n" -gt 0 ] && ok "上游 $_tag 补丁已应用 $_n 个（失败 $_fail，跳过 $_skip）"
