@@ -159,6 +159,19 @@ if [ -f "$GC" ] && grep -qE '^CONFIG_SWCONFIG_LEDS=y$' "$GC"; then
 else
 	ok "上游 generic/config-6.12 未强制 SWCONFIG_LEDS=y"
 fi
+# 必需清单：上游 generic/files 不提供这些文件，漏投递会在 target/linux 编译期
+# 报 fatal error: linux/rtl8366.h: No such file or directory 而中断整个构建。
+for f in \
+	drivers/net/phy/rtl8366_smi.c \
+	drivers/net/phy/rtl8366_smi.h \
+	drivers/net/phy/rtl8367b.c \
+	include/linux/rtl8366.h \
+	include/linux/rtl8367.h \
+	include/linux/switch.h
+do
+	[ -f "$DEV/kernel-files/generic/$f" ] \
+		&& ok "kernel-files 必需项 $f" || bad "缺 kernel-files 必需项 $f（target/linux 将编译失败）"
+done
 # 驱动 overlay 必须逐字节投递到 generic/files
 for f in $(cd "$DEV/kernel-files/generic" && find . -type f | sed 's|^\./||'); do
 	cmp -s "$DEV/kernel-files/generic/$f" "$ROOT/target/linux/generic/files/$f" \
