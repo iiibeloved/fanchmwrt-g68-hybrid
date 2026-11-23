@@ -51,18 +51,36 @@ arch/arm64/boot/dts/rockchip/rk3568.dtsi
 arch/arm64/boot/dts/rockchip/Makefile
 "
 W=$(mktemp -d); trap 'rm -rf "$W" 2>/dev/null || true' EXIT HUP INT TERM
-SRC="https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain"
+# 两个源：kernel.org cgit 优先（稳定），gregkh/linux 的 stable tag 兜底。
+# 首个文件探测成功后固定使用该源，避免每个文件都超时等两遍。
+SRC1="${PREFLIGHT_SRC1:-https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain}"
+SRC2="${PREFLIGHT_SRC2:-https://raw.githubusercontent.com/gregkh/linux}"
+SRC_USE=""
+TMO=15
+
+_dl() { # _dl <url> <目标>
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL --retry 0 --max-time $TMO -o "$2" "$1" 2>/dev/null && [ -s "$2" ]
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q -T $TMO -O "$2" "$1" 2>/dev/null && [ -s "$2" ]
+	else
+		return 2
+	fi
+}
 
 fetch() { # fetch <相对路径>
 	_d="$W/$1"
 	mkdir -p "$(dirname "$_d")"
-	if command -v curl >/dev/null 2>&1; then
-		curl -fsSL --retry 2 --max-time 60 -o "$_d" "$SRC/$1?h=$TAG" 2>/dev/null && return 0
-	elif command -v wget >/dev/null 2>&1; then
-		wget -q -T 60 -O "$_d" "$SRC/$1?h=$TAG" 2>/dev/null && return 0
-	else
-		return 2
+	if [ -n "$SRC_USE" ]; then
+		case "$SRC_USE" in
+			*gregkh*) _dl "$SRC_USE/$TAG/$1" "$_d" && return 0 ;;
+			*)        _dl "$SRC_USE/$1?h=$TAG" "$_d" && return 0 ;;
+		esac
+		rm -f "$_d"; return 1
 	fi
+	if _dl "$SRC1/$1?h=$TAG" "$_d"; then SRC_USE="$SRC1"; return 0; fi
+	if _dl "$SRC2/$TAG/$1" "$_d"; then SRC_USE="$SRC2"; return 0; fi
+	rm -f "$_d"
 	return 1
 }
 
@@ -97,8 +115,14 @@ patch_files() { # patch_files <patch> -> 逐个打印 -p1 后的相对路径
 apply_series() { # apply_series <目录> <标签>
 	_dir="$1"; _tag="$2"; _n=0; _fail=0; _skip=0
 	[ -d "$_dir" ] || return 0
-	for p in $(ls "$_dir"/*.patch 2>/dev/null | sort); do
+	# 必须在进入子 shell 前解析成绝对路径：`( cd "$W" && patch < "$p" )` 里的
+	# 重定向是**子 shell 内**求值的，相对路径会指向 $W 导致 "cannot open"。
+	_dir_abs=$(cd "$_dir" && pwd)
+	for p in $(ls "$_dir_abs"/*.patch 2>/dev/null | sort); do
 		touches "$p" || continue
+		# 本仓 device/kernel-patches 已被 apply-device.sh 拷进该目录，
+		# 后面会显式再打一遍；这里跳过，避免「重复应用」被误判为失配。
+		[ -f "$DEV/kernel-patches/$(basename "$p")" ] && continue
 		# 该补丁若同时改其它文件，按需补下（保证 hunk 上下文与真实构建一致）；
 		# 补不下来就跳过整条并告警 —— 宁可预检不完整，也不要误报失败。
 		_ok=1
