@@ -111,6 +111,17 @@ if [ "$MODE" = "built" ]; then
 	else
 		bad "未找到 u-boot .config"
 	fi
+	# 上游调用点守卫：2025.10 由 arch/arm/mach-rockchip/board.c:board_late_init()
+	# 调用 setup_boot_mode()；若上游再把调用点搬走/删除，overlay 里的函数再完整
+	# 也不会被执行。只在 built 模式查真实解压后的源码树，零额外下载。
+	UBOARD=$(find "$ROOT/build_dir" -path '*u-boot*' -path '*/arch/arm/mach-rockchip/board.c' 2>/dev/null | head -1 || true)
+	if [ -n "$UBOARD" ]; then
+		grep -q 'setup_boot_mode();' "$UBOARD" \
+			&& ok "上游 board.c 仍调用 setup_boot_mode（$UBOARD）" \
+			|| bad "上游 board.c 已不调用 setup_boot_mode —— 长按复位进 MaskROM 会静默失效，禁止发布"
+	else
+		bad "未找到解压后的 u-boot board.c，无法验证 MaskROM 入口调用点"
+	fi
 fi
 
 echo
