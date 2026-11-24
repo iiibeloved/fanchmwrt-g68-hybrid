@@ -186,6 +186,16 @@ jobs:
           # swconfig：上游 rockchip 默认走 DSA，不含此用户态工具；
           # 但 G68 hybrid 的 swconfig 交换路线必须用它应用 VLAN，豁免去重注释。
           args+=(--allow swconfig)
+          # 关键包豁免：package-guard 发现它们与上游同名时会生成「注释掉」的
+          # 配置副本并开 PR；一旦误合并，selftest/verify-critical 会因缺包失败。
+          # 这些包要么是本仓杂交价值（fcm/主题），要么是网络/SMSC 生命线，
+          # 必须在 configs/g68-fanchm.config 中保持显式 =y。
+          for p in kmod-fwx fwxd libfwx_common kmod-shortcut-fe kmod-nft-fullcone \
+                   luci-app-fwx-dashboard luci-theme-fanchmwrt \
+                   kmod-switch-rtl8366-smi kmod-switch-rtl8367b \
+                   kmod-phy-smsc kmod-usb-net-smsc95xx; do
+            args+=(--allow "$p")
+          done
           [ -f configs/builtin-list.txt ] && args+=(--builtin-list configs/builtin-list.txt)
           for f in fanchmwrt/feeds/*.index; do [ -f "$f" ] && args+=(--index "$f"); done
           args+=(--makefile-dir fanchmwrt/package --makefile-dir fanchmwrt/feeds)
