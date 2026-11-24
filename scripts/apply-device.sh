@@ -134,19 +134,31 @@ IMGBLOCK
 	say "image/armv8.mk: 已追加 Device/nsy_g68-plus"
 fi
 
-# ---------- 7) gen_image_generic.sh：rootfs_data 默认 4096 MiB ----------
+# ---------- 7) gen_image_generic.sh：补回 4096 MiB rootfs_data 分区 ----------
+# 24.10 上游脚本有 USERDATASIZE="2048"，改成 4096 即可；25.12 上游（实测
+# fanchmwrt-25.12.6）把该变量和第三个分区一起删了：pine64-img 只给 ptgen
+# 传 kernel/rootfs 两组 -t/-p，镜像 MBR 只有 2 个分区。
+# 但 squashfs 固件必须有一块独立 rootfs_data 才能保存 overlay/配置；
+# build.yml 的 check-partition-table.py 也按 4096 MiB 校验产物，
+# 不补分区会在「编译成功后的收集产物步骤」必然失败（此前构建均未跑到该步）。
 GEN="$ROOT/scripts/gen_image_generic.sh"
 [ -f "$GEN" ] || die "找不到 $GEN"
-if ! grep -q 'ROOTFS_DATA_PARTSIZE' "$GEN"; then
-	if grep -q '^USERDATASIZE="2048"$' "$GEN"; then
-		sed -i 's/^USERDATASIZE="2048"$/USERDATASIZE="${ROOTFS_DATA_PARTSIZE:-4096}"/' "$GEN"
-		say "gen_image_generic.sh: rootfs_data 默认 4096 MiB"
-	else
-		# 25.12 上游脚本结构变化（无 USERDATASIZE="2048" 锚点）。
-		# 分区大小已由 config 的 CONFIG_TARGET_ROOTFS_PARTSIZE 控制，
-		# 此项非网络/MaskROM 生命线，容错跳过，不影响功能。
-		say "警告: gen_image_generic.sh 无 USERDATASIZE 锚点（25.12 结构变化），跳过 rootfs_data 调整"
-	fi
+if grep -q 'USERDATASIZE:-4096' "$GEN"; then
+	say "gen_image_generic.sh: rootfs_data 分区已补齐（4096 MiB，跳过）"
+elif grep -q '^USERDATASIZE="2048"$' "$GEN"; then
+	sed -i 's/^USERDATASIZE="2048"$/USERDATASIZE="${ROOTFS_DATA_PARTSIZE:-4096}"/' "$GEN"
+	grep -q 'ROOTFS_DATA_PARTSIZE:-4096' "$GEN" \
+		|| die "gen_image_generic.sh: USERDATASIZE 改写失败"
+	say "gen_image_generic.sh: USERDATASIZE 2048 -> 4096 MiB"
+elif grep -Fq -- '-t "${ROOTFSPARTTYPE}" -p "${ROOTFSSIZE}m"' "$GEN"; then
+	# 在 rootfs 之后追加第三块分区；ptgen 多返回一组 offset/size，
+	# 脚本只取 $1~$4（kernel/rootfs），因此后续 dd 寻址不受影响。
+	sed -i 's|-t "${ROOTFSPARTTYPE}" -p "${ROOTFSSIZE}m"|-t "${ROOTFSPARTTYPE}" -p "${ROOTFSSIZE}m" -t "${ROOTFSPARTTYPE}" -p "${USERDATASIZE:-4096}m"|' "$GEN"
+	grep -Fq -- '-p "${USERDATASIZE:-4096}m"' "$GEN" \
+		|| die "gen_image_generic.sh: rootfs_data 分区插入失败（结构变化）"
+	say "gen_image_generic.sh: 已补第三块 rootfs_data 分区（默认 4096 MiB，MBR 标称）"
+else
+	die "gen_image_generic.sh: 找不到 USERDATASIZE 或 ptgen 分区锚点，无法保证 rootfs_data 4096 MiB（产物校验会失败）"
 fi
 
 # ---------- 7.5) 自定义 files/（菜单资产 / uci-defaults / 中文覆盖数据）----------
