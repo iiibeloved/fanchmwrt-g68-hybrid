@@ -26,7 +26,10 @@ on:
         default: true
 concurrency:
   group: g68-fanchm-${{ github.ref }}
-  cancel-in-progress: false
+  # watcher 失败即推修复：旧构建若继续跑会占住 group，让修好的新代码无限排队
+  # （实测 45295861972 卡在 u-boot 编译，gh run cancel 未生效，新 run 一直 pending）。
+  # 改成自动取消同组旧 run，保证最新 head 总能立刻开构建；守卫挂载点不受影响。
+  cancel-in-progress: true
 permissions:
   contents: write
   issues: write
