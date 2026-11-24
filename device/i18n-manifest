@@ -1,11 +1,26 @@
+# G68 中文覆盖清单：包名<TAB>rootfs 相对路径（不带前导 /）
+# 由 device/files/usr/bin/g68-i18n 在开机 / uci-defaults 时按「已安装应用」投递。
+#
+# 2026-11-23 审查（25.12 / apk 基座）：
+#  只保留「与锁定 small feed 版本逐行一致、仅替换中文字符串」的副本。
+#  已移除 24.10 / iStoreOS 时代的 9 个「整应用实现」覆盖：
+#    - luci-app-filetransfer 全套 5 个：本仓是 DustReliant 2024 的 iStoreOS 版
+#      （controller 777 行，ALLOWED_EXTENSIONS 里只有 ipk 没有 apk），
+#      而 25.12 small feed 是 lean 版（controller 13 行），两者毫无关系；
+#      投递会把文件传输功能整体换掉，且 .apk 固件包会被上传白名单拒绝。
+#    - luci-app-timecontrol 的 basic.js / log.js：压缩过的另一版实现
+#      （17/46 行）vs 上游 sirpdboy 版（334/238 行），RPC/UCI 字段不保证一致。
+#    - luci-app-emmc-health / luci-app-lan-scanner：锁定的 small feed 里根本
+#      没有这两个包，是 24.10 遗留的死条目。
+#  这些应用的可翻译字符串由 config 里已选的 luci-i18n-*-zh-cn（.lmo）负责；
+#  定制标题由下面保留的 controller / menu.d 覆盖负责。
+#  运行时 compat_ok() 还会再拦一道：目标文件行数对不上就拒绝投递。
+#
+# 注意：dockermanager 当前未在 configs/g68-fanchm.config 选中，保留清单项
+# 是为了用户日后 apk add 后重启即可获得中文（覆盖本身已核验为纯翻译，安全）。
 luci-app-dockermanager	usr/lib/lua/luci/controller/dockermanager.lua
 luci-app-dockermanager	usr/lib/lua/luci/model/cbi/dockermanager.lua
 luci-app-dockermanager	usr/lib/lua/luci/view/dockermanager_status.htm
-luci-app-filetransfer	usr/lib/lua/luci/controller/filetransfer.lua
-luci-app-filetransfer	usr/lib/lua/luci/model/cbi/filetransfer.lua
-luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/main.htm
-luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/manage.htm
-luci-app-filetransfer	usr/lib/lua/luci/view/filetransfer/log.htm
 luci-app-wolplus	usr/lib/lua/luci/controller/wolplus.lua
 luci-app-wolplus	usr/lib/lua/luci/model/cbi/wolplus.lua
 luci-app-wolplus	usr/lib/lua/luci/view/wolplus/index.htm
@@ -18,8 +33,4 @@ luci-app-control-weburl	usr/lib/lua/luci/controller/weburl.lua
 luci-app-control-weburl	usr/lib/lua/luci/model/cbi/weburl.lua
 luci-app-control-weburl	usr/lib/lua/luci/view/weburl/index.htm
 luci-app-control-weburl	usr/lib/lua/luci/view/weburl/weburl.htm
-luci-app-timecontrol	www/luci-static/resources/view/timecontrol/basic.js
-luci-app-timecontrol	www/luci-static/resources/view/timecontrol/log.js
 luci-app-timecontrol	usr/share/luci/menu.d/luci-app-timecontrol.json
-luci-app-emmc-health	www/luci-static/resources/view/emmc-health.js
-luci-app-lan-scanner	www/luci-static/resources/view/lan-scanner.js

@@ -24,7 +24,8 @@ NSY G68-PLUS（RK3568 / RTL8367S）杂交固件工作区。目标是把 **Fanchm
 - **默认主题**：`luci-theme-fanchmwrt`；`96-g68-fanchm-theme` 在首次启动把 `luci.main.mediaurlbase` 指向 `/luci-static/fanchmwrt`（目录存在时才写，避免写坏 LuCI），并在上游 `31_luci-theme-fanchmwrt` 缺失时补回 `luci.themes.FanchmWrt`
 - **fwx 界面清单**：与上游 `include/target.mk` 的 `DEFAULT_PACKAGES.router` 逐项对齐（16 个 `luci-app-fwx-*` + `traffic-stat` + `fastnat`）
 - **守卫**：`verify-critical.sh` 的 `STYLE_FORBIDDEN` 清单在 **defconfig 后 + manifest** 双阶段拦截，任一风格包回流即 fail-fast
-- **中文覆盖**：`g68-i18n` 同时识别 **apk / opkg**（25.12 为 apk），否则会把已安装应用误判为“未安装”
+- **中文覆盖**：`g68-i18n` 同时识别 **apk / opkg**（25.12 为 apk），否则会把已安装应用误判为“未安装”；详见第六节「24.10 → 25.12 的 i18n 适配」
+- **软件包页面**：24.10 的 `luci-app-opkg` 已关（apk 基座上失效）。25.12 用 `luci-app-package-manager`（`PKG_PROVIDES:=luci-app-opkg`，FanchmWrt 另补了 apk 版 `package-manager-call`）；它是 LuCI 原生软件包列表页、**不是商城**，按“无商城”决策暂不启用，需要时把 config 里该行改成 `=y`
 
 ## 三、长期不变目标（守卫固化，上游更新不得削弱）
 
@@ -93,7 +94,58 @@ scripts/
 - **Release 标签**：`g68-fanchm-YYYY.MM.DD`（重名追加 `-rN`）
 - **不一致即停**：任一守卫失败则中止，不发 Release，自动开 issue
 
-## 六、刷机
+## 六、i18n / apk 迁移适配（24.10 → 25.12）
+
+### 后缀到底变了什么
+
+| 项 | 24.10 | 25.12 | 对中文覆盖的影响 |
+| --- | --- | --- | --- |
+| 包归档 | `.ipk`（opkg） | `.apk`（apk-tools 3.x） | **无**：只换归档格式，包内文件清单与 rootfs 路径不变 |
+| 安装库 | `/usr/lib/opkg/info/*.control` | `/lib/apk/db/installed` 的 `P:<包名>` 行 | **有**：`pkg_installed` 必须两边都认 |
+| LuCI po 目录 | `po/zh-cn/` | `po/zh_Hans/`（small feed 用 symlink 双向兼容） | **有**：上游目录改名 |
+| i18n 包名 | `luci-i18n-<app>-zh-cn` | **同左** | 无：`luci.mk` 的 `LUCI_LC_ALIAS.zh_Hans=zh-cn` 保证 |
+| 翻译产物 | `.lmo` → `/usr/lib/lua/luci/i18n/` | 同左 | 无 |
+
+本仓的中文覆盖走 `files/` 注入 + `g68-i18n` 运行时 `cp`，**完全不经过包管理器**，
+所以 `.ipk → .apk` 本身不会让覆盖失效；会失效的是「判定已安装」这一步（已修）。
+
+### 覆盖文件的边界（2026-11-23 全量审查）
+
+官方 `.lmo`（config 里 `luci-i18n-*-zh-cn=y`）负责应用内部可翻译字符串，
+本仓覆盖只负责少量定制标题（"网络唤醒++"、"上网时间控制" 等）。两者互补。
+
+审查发现 **9 个覆盖其实是 24.10 / iStoreOS 时代的整应用实现**，已从两处 manifest
+移除并删除文件：
+
+- `luci-app-filetransfer` 全套 5 个：本仓是 DustReliant 2024 的 iStoreOS 版
+  （controller **777 行**，`ALLOWED_EXTENSIONS` 只列 `ipk` 不列 `apk`）；
+  25.12 锁定的 small feed 是 lean 版（**13 行**）。投递会把文件传输功能整体换掉，
+  而且用户上传 `.apk` 固件包会被上传白名单直接拒绝。
+- `luci-app-timecontrol` 的 `basic.js` / `log.js`：压缩过的另一版实现（17/46 行）
+  vs 上游 sirpdboy 版（334/238 行），RPC / UCI 字段不保证一致。
+- `emmc-health.js` / `lan-scanner.js`：锁定的 small feed 里根本没有这两个包，
+  是 24.10 遗留死条目（`lan-scanner.js` 还带 UTF-8 BOM）。
+
+保留的 **16 项**已逐文件与锁定 feed 版本 diff 核验：行数一致、只替换中文字符串
+（相似度 0.83~1.0，`model/cbi/*.lua` 的低相似度来自中文译文长度，非逻辑改动）。
+
+### 运行时三道防线
+
+1. `pkg_installed` 优先读 `/lib/apk/db/installed`，用 `grep -qxF "P:<包名>"`
+   固定串匹配（包名里的 `.` 不再被当成正则通配），另有 `apk info/query/list`
+   与 opkg 多重兜底 —— apk-tools 3.x 把 `info` 改名 `query` 也不会再静默失效。
+2. `compat_ok()` 版本指纹：目标文件行数与覆盖文件差 > 2 行即跳过并告警，
+   防止上游换实现后旧覆盖把应用降级；被拦截时中文仍由官方 `.lmo` 兜底。
+3. 投递后清 `/tmp/luci-indexcache.<hash>.json` 与 `/tmp/luci-modulecache/`
+   （LuCI 25.12 的菜单树缓存），否则开机重投递后看到的仍是旧英文菜单。
+
+`selftest §16` 守住：两处 manifest 一致、引用完整、每个应用有官方中文包兜底、
+无 24.10 特征回流、`luci-app-opkg` 已关闭。
+
+> 真机仍需确认：官方 `.lmo` 是否覆盖全部可见文案；`www/luci-static/*.js`
+> 的浏览器缓存需强刷一次。二者都不影响刷机与网络。
+
+## 七、刷机
 
 1. USB 双公头线连接电脑与设备（OTG/靠网口 USB）
 2. RKDevTool v3.18 + 驱动 v5.12
@@ -104,11 +156,12 @@ scripts/
 
 > 若长按无效，可用短接触点法兜底（BROM 模式，loader 相同）。
 
-## 七、状态与已知风险
+## 八、状态与已知风险
 
 - **当前阶段**：`prepare`（设备层投递 + 补丁预检 + 静态自检 + 硬件审核）已通过，进入 `uboot-check`；`build` 全量编译待启动
 - **首要风险（已消除）**：910/913/915 原本是 6.6 时代补丁；对齐到 FanchmWrt 的 `v6.12.112 + 039-*` 补丁栈后**在本机实证零 fuzz 全命中**，并新增 `patch-preflight.sh` 把这个判定提前到 prepare（上游再动会 40s 内报出来）
 - **次要风险**：`kmod-usb-serial-option` 等蜂窝反向依赖在 25.12 的 select 链可能与 6.6 不同（沿用 hybrid 的 32 包清单 + 全 feed 反向依赖扫描方法处理）
+- **i18n 剩余风险**：官方 `.lmo` 的译文完整度、LuCI 静态 JS 的浏览器缓存（见第六节），需真机确认；编译期已由 `selftest §16` + 版本指纹守卫兜住
 - **已修（本轮审计）**：
   - 缺失 `configs/feed-precedence.txt`（会让 build job 在 defconfig 后直接 exit 1）
   - `g68-i18n` 不识别 apk（25.12 基座上中文覆盖永不投递、还会误删已有覆盖）
@@ -121,6 +174,6 @@ scripts/
   - **DTS 重复 label**：板级 DTS 里的 `gmac0_xpcsclk`/`gmac1_xpcsclk` 与 911 注入的同名 label 冲突（dtc `duplicate_label` 直接编译失败）→ 已删除板级定义，并在 `verify-network.sh dts` 加反向断言
   - 注释残留 iStoreOS 字样（`02_network_g68`、`915-*.patch` 头），内容不变
 
-## 八、授权边界
+## 九、授权边界
 
 FanchmWrt 源码 README 声明家长控制功能**仅供个人使用，不得用于公司或集成进商用产品**。本工作区仅供个人家用研究。

@@ -349,6 +349,55 @@ for p in kmod-oaf appfilter luci-app-oaf; do
 		&& bad "$p 仍启用（与 kmod-fwx 的 netfilter hook 冲突）" || ok "$p 已关闭"
 done
 
+echo "== 16. i18n 中文覆盖（25.12 / apk 基座适配）=="
+# 24.10 → 25.12 的两个变化：包归档 .ipk → .apk（不改 rootfs 路径），
+# LuCI 语言目录 po/zh-cn → po/zh_Hans（但包名经 LUCI_LC_ALIAS.zh_Hans=zh-cn
+# 仍是 luci-i18n-*-zh-cn）。本仓的中文覆盖是 files/ 注入 + 运行时 cp，
+# 不经过包管理器，所以后缀变化本身不影响；真正会坏的是：
+#   a) pkg_installed 只认 opkg → 一律判「未安装」，中文永不投递还会误删；
+#   b) 开机重投递后不清 LuCI 25.12 的 /tmp/luci-indexcache.<hash>.json；
+#   c) 24.10 时代的「整应用实现」覆盖打到 25.12 的新实现上（曾发现
+#      filetransfer 的 iStoreOS 版 777 行 vs lean 版 13 行）。
+I18N="$DEV/files/usr/bin/g68-i18n"
+M1="$DEV/i18n-manifest"
+M2="$DEV/files/usr/share/g68/i18n-manifest"
+[ -x "$I18N" ] && ok "g68-i18n 可执行" || bad "g68-i18n 无可执行位（CI 上 init.d 不会 enable）"
+cmp -s "$M1" "$M2" && ok "两处 i18n-manifest 一致" || bad "两处 i18n-manifest 不一致（设备侧会读到旧清单）"
+grep -q 'APKDB=/lib/apk/db/installed' "$I18N" 2>/dev/null \
+	&& ok "识别 apk 安装库（不依赖 apk 3.x 改名的子命令）" || bad "缺 apk 安装库识别"
+grep -q 'grep -qxF "P:\$1"' "$I18N" 2>/dev/null \
+	&& ok "apk 包名用固定串匹配" || bad "apk 包名匹配用了正则（'.' 会误命中）"
+grep -q 'luci-indexcache' "$I18N" 2>/dev/null \
+	&& ok "投递后清 LuCI 25.12 菜单缓存" || bad "缺清缓存（开机重投递后中文不生效）"
+grep -q 'compat_ok' "$I18N" 2>/dev/null \
+	&& ok "版本指纹守卫存在（拒绝旧实现整文件覆盖）" || bad "缺版本指纹守卫"
+# 异实现特征不得回流到 overlay：iStoreOS 版 filetransfer 的 ipk 上传白名单
+if grep -rq 'ALLOWED_EXTENSIONS\|DustReliant' "$DEV/i18n-overlay" 2>/dev/null; then
+	bad "i18n-overlay 里仍有 24.10/iStoreOS 版整应用实现（会替换 25.12 的 lean 版，且 .apk 被上传白名单拒绝）"
+else
+	ok "i18n-overlay 无 24.10 整应用实现"
+fi
+# 清单引用完整性 + 官方 .lmo 翻译包兜底
+MISS=0; NITEM=0
+while IFS=$(printf '\t') read -r p f; do
+	case "$p" in ''|\#*) continue ;; esac
+	NITEM=$((NITEM+1))
+	[ -f "$DEV/i18n-overlay/$f" ] || { bad "清单引用不存在的覆盖文件: $f"; MISS=$((MISS+1)); }
+done < "$M1"
+[ "$MISS" -eq 0 ] && ok "清单引用完整（$NITEM 项）"
+for p in $(cut -f1 "$M1" | grep -v '^#' | sort -u); do
+	# dockermanager 上游没有 po 目录（无官方翻译包），且当前未选中，跳过
+	[ "$p" = "luci-app-dockermanager" ] && continue
+	suffix=${p#luci-app-}
+	grep -qx "CONFIG_PACKAGE_luci-i18n-${suffix}-zh-cn=y" "$CFG" \
+		&& ok "$p 有官方中文包兜底" || bad "缺 $p 的 luci-i18n-*-zh-cn（覆盖被拦截时界面会退回英文）"
+done
+# 25.12 已用 apk：24.10 的 opkg 页面必须关掉（FanchmWrt 用
+# luci-app-package-manager + apk 版 package-manager-call 取代）
+grep -qx 'CONFIG_PACKAGE_luci-app-opkg=y' "$CFG" \
+	&& bad "luci-app-opkg 仍启用（apk 基座上该页面失效，应换成 luci-app-package-manager）" \
+	|| ok "24.10 的 luci-app-opkg 已关闭"
+
 if [ "$FAIL" -gt 0 ]; then
 	echo "自检失败：$FAIL 项"
 	exit 1
