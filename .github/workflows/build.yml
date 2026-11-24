@@ -25,9 +25,10 @@ on:
         type: boolean
         default: true
 concurrency:
-  # v2：旧 group 里的 run 45295861972 runner 无响应、API cancel 不生效，
-  # 换组名让含修复的构建绕过卡死的锁立即开跑。
-  group: g68-fanchm-v2-${{ github.ref }}
+  # v3：run 45297448067 在 uboot-check 的 u-boot 编译步骤无响应 25 分钟，
+  # 同组 cancel-in-progress 未能解除锁、修好的新 run 一直 pending；
+  # 换组名让含修复的构建绕过卡死的 runner（与 v2 的处置方式一致）。
+  group: g68-fanchm-v3-${{ github.ref }}
   # watcher 失败即推修复：旧构建若继续跑会占住 group，让修好的新代码无限排队
   # （实测 45295861972 卡在 u-boot 编译，gh run cancel 未生效，新 run 一直 pending）。
   # 改成自动取消同组旧 run，保证最新 head 总能立刻开构建；守卫挂载点不受影响。
