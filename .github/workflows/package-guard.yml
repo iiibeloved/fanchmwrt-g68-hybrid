@@ -113,7 +113,12 @@ jobs:
             --json package-guard-out/report.json \
             --md package-guard-out/report.md \
             --allow dnsmasq-full \
-            --allow swconfig
+            --allow swconfig \
+            --allow kmod-fwx --allow fwxd --allow libfwx_common \
+            --allow kmod-shortcut-fe --allow kmod-nft-fullcone \
+            --allow luci-app-fwx-dashboard --allow luci-theme-fanchmwrt \
+            --allow kmod-switch-rtl8366-smi --allow kmod-switch-rtl8367b \
+            --allow kmod-phy-smsc --allow kmod-usb-net-smsc95xx
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           d = json.load(open('package-guard-out/report.json', encoding='utf-8'))['counts']
