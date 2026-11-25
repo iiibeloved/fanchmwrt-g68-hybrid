@@ -118,7 +118,8 @@ jobs:
           SUB=$(g CONFIG_TARGET_SUBTARGET); SUB=${SUB:-armv8}
           [ "$(g CONFIG_TARGET_rockchip_armv8_DEVICE_nsy_g68-plus)" = "y" ] \
             || { echo "::error::未选中 G68 设备"; exit 1; }
-          [ "$DTS" = "rockchip/rk3568-nsy-g68-plus" ] \
+          # 6.12 image/Makefile 的 DEVICE_DTS_DIR 已带 rockchip 前缀，DEVICE_DTS 不带。
+          [ "$DTS" = "rk3568-nsy-g68-plus" ] \
             || { echo "::error::DTS 目标不一致: ${DTS:-空}"; exit 1; }
           [ "$UBOOT" = "nsy-g68-plus-rk3568" ] \
             || { echo "::error::U-Boot 目标不一致: ${UBOOT:-空}"; exit 1; }
