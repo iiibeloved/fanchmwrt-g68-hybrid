@@ -25,9 +25,9 @@ on:
         type: boolean
         default: true
 concurrency:
-  # v4：连续推送修复时同组旧 run 的 runner 未响应 cancel，新 run 会一直 pending；
-  # 换组名让含全部修复的最新 head 立即开跑（v2/v3 的既定处置方式）。
-  group: g68-fanchm-v4-${{ github.ref }}
+  # v5：空提交修复导致 head 4976df10 的 run 45523783254 卡在 runner 不响应 cancel，
+  # 含真修复的 head 02d7b8d5 新 run 一直 pending；换组名绕过（v2/v3/v4 既定处置）。
+  group: g68-fanchm-v5-${{ github.ref }}
   # watcher 失败即推修复：旧构建若继续跑会占住 group，让修好的新代码无限排队
   # （实测 45295861972 卡在 u-boot 编译，gh run cancel 未生效，新 run 一直 pending）。
   # 改成自动取消同组旧 run，保证最新 head 总能立刻开构建；守卫挂载点不受影响。
