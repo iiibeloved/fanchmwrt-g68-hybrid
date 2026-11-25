@@ -2088,7 +2088,8 @@ static int  rtl8367b_probe(struct platform_device *pdev)
 	return err;
 }
 
-static int rtl8367b_remove(struct platform_device *pdev)
+/* Linux 6.12: platform_driver.remove returns void (remove may not fail). */
+static void rtl8367b_remove(struct platform_device *pdev)
 {
 	struct rtl8366_smi *smi = platform_get_drvdata(pdev);
 
@@ -2098,8 +2099,6 @@ static int rtl8367b_remove(struct platform_device *pdev)
 		rtl8366_smi_cleanup(smi);
 		kfree(smi);
 	}
-
-	return 0;
 }
 
 static void rtl8367b_shutdown(struct platform_device *pdev)
