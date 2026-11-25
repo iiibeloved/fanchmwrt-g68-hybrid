@@ -126,7 +126,7 @@ define Device/nsy_g68-plus
   DEVICE_VENDOR := NSY
   DEVICE_MODEL := G68-PLUS
   SOC := rk3568
-  DEVICE_DTS := rockchip/rk3568-nsy-g68-plus
+  DEVICE_DTS := rk3568-nsy-g68-plus
   UBOOT_DEVICE_NAME := nsy-g68-plus-rk3568
 endef
 TARGET_DEVICES += nsy_g68-plus
