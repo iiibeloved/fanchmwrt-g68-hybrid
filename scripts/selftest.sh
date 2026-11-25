@@ -180,6 +180,14 @@ for f in $(cd "$DEV/kernel-files/generic" && find . -type f | sed 's|^\./||'); d
 done
 grep -q 'realtek,rtl8367s' "$DEV/kernel-files/generic/drivers/net/phy/rtl8367b.c" \
 	&& ok "rtl8367b 驱动含 realtek,rtl8367s" || bad "rtl8367b 驱动缺 RTL8367S 支持"
+# Linux 6.12 的 platform_driver.remove 回调签名为 void (*)(struct platform_device *)，
+# 旧版（<=5.x）int 返回值会在 -Wincompatible-pointer-types 下编译失败（已实际踩坑）。
+# 守卫：rtl8367b_remove 必须是 void，防上游/旧签名回流。
+if grep -qE 'static void[[:space:]]+rtl8367b_remove[[:space:]]*\(' "$DEV/kernel-files/generic/drivers/net/phy/rtl8367b.c"; then
+	ok "rtl8367b_remove 签名为 void（6.12 API）"
+else
+	bad "rtl8367b_remove 不是 void —— 6.12 下 platform_driver.remove 将编译失败"
+fi
 # swconfig 用户态工具是 VLAN 分组生效的必要条件，内核 kmod 无法替代；
 # 缺它则 LAN 口桥接建不起来（真机拿不到 IP），必须一并断言。
 for pkg in swconfig kmod-swconfig kmod-switch-rtl8366-smi kmod-switch-rtl8367b; do
