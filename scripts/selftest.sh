@@ -78,6 +78,11 @@ sed -n '/^UBOOT_TARGETS/,/^$/p' "$UB/Makefile" | grep -q "nsy-g68-plus-rk3568" &
 IMG="$ROOT/target/linux/rockchip/image/armv8.mk"
 grep -q "define Device/nsy_g68-plus" "$IMG" && ok "Device/nsy_g68-plus" || bad "缺 Device 定义"
 grep -q "TARGET_DEVICES += nsy_g68-plus" "$IMG" && ok "TARGET_DEVICES" || bad "缺 TARGET_DEVICES"
+# 6.12 image/Makefile 的 DEVICE_DTS_DIR 已带 rockchip 前缀（=$(DTS_DIR)/rockchip），
+# DEVICE_DTS 若再写 rockchip/ 会拼成 rockchip/rockchip/... 导致 DTB 编译 fatal error。
+grep -q 'DEVICE_DTS := rk3568-nsy-g68-plus' "$IMG" \
+	&& ok "DEVICE_DTS 无 rockchip/ 前缀" || bad "DEVICE_DTS 前缀错误（应为 rk3568-nsy-g68-plus，不带 rockchip/）"
+! grep -q 'DEVICE_DTS := rockchip/' "$IMG" && ok "无双重 rockchip/ 路径" || bad "DEVICE_DTS 含 rockchip/ 前缀（6.12 会拼成双重路径）"
 # 25.12  gen_image_generic.sh 不再自带 USERDATASIZE/第三分区；apply-device.sh
 # 必须显式补回，否则 MBR 只有 kernel+rootfs，build.yml 的
 # check-partition-table.py 会在「编译成功后」因找不到 4096 MiB 分区而失败。
