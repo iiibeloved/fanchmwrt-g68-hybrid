@@ -83,6 +83,12 @@ grep -q "TARGET_DEVICES += nsy_g68-plus" "$IMG" && ok "TARGET_DEVICES" || bad "�
 grep -q 'DEVICE_DTS := rk3568-nsy-g68-plus' "$IMG" \
 	&& ok "DEVICE_DTS 无 rockchip/ 前缀" || bad "DEVICE_DTS 前缀错误（应为 rk3568-nsy-g68-plus，不带 rockchip/）"
 ! grep -q 'DEVICE_DTS := rockchip/' "$IMG" && ok "无双重 rockchip/ 路径" || bad "DEVICE_DTS 含 rockchip/ 前缀（6.12 会拼成双重路径）"
+# 6.12 Build/fit 传 -a $(KERNEL_LOADADDR) -e $(KERNEL_ENTRY 或 LOADADDR)；Device/Default
+# 把 KERNEL_LOADADDR 置空，设备块若未显式赋值，mkits.sh 收到空 -a/-e 会 usage 退出。
+sed -n '/^define Device\/nsy_g68-plus/,/^endef/p' "$IMG" \
+	| grep -q 'KERNEL_LOADADDR := 0x03000000' \
+	&& ok "KERNEL_LOADADDR 显式赋值（mkits.sh -a/-e 非空）" \
+	|| bad "Device/nsy_g68-plus 缺 KERNEL_LOADADDR（mkits.sh 必败）"
 # 25.12  gen_image_generic.sh 不再自带 USERDATASIZE/第三分区；apply-device.sh
 # 必须显式补回，否则 MBR 只有 kernel+rootfs，build.yml 的
 # check-partition-table.py 会在「编译成功后」因找不到 4096 MiB 分区而失败。

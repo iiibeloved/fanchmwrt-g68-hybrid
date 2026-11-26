@@ -126,12 +126,23 @@ define Device/nsy_g68-plus
   DEVICE_VENDOR := NSY
   DEVICE_MODEL := G68-PLUS
   SOC := rk3568
+  # 6.12 image/Default 的 KERNEL_LOADADDR 为空，必须显式继承 rk3568 基类值；
+  # 否则 Build/fit 传给 mkits.sh 的 -a/-e 均为空，mkits.sh 直接 usage + exit 1。
+  KERNEL_LOADADDR := 0x03000000
   DEVICE_DTS := rk3568-nsy-g68-plus
   UBOOT_DEVICE_NAME := nsy-g68-plus-rk3568
 endef
 TARGET_DEVICES += nsy_g68-plus
 IMGBLOCK
 	say "image/armv8.mk: 已追加 Device/nsy_g68-plus"
+else
+	# 历史版本创建的 Device 块缺 KERNEL_LOADADDR；幂等补回，避免同一根因复现。
+	if ! sed -n '/^define Device\/nsy_g68-plus/,/^endef/p' "$IMG" | grep -q 'KERNEL_LOADADDR'; then
+		sed -i '/^define Device\/nsy_g68-plus/,/^endef/s/^  SOC := rk3568$/  SOC := rk3568\n  KERNEL_LOADADDR := 0x03000000/' "$IMG"
+		grep -q 'KERNEL_LOADADDR := 0x03000000' "$IMG" \
+			|| die "KERNEL_LOADADDR 幂等补回失败（armv8.mk 结构变化）"
+		say "image/armv8.mk: 已补回 KERNEL_LOADADDR（历史 Device 块修复）"
+	fi
 fi
 
 # ---------- 7) gen_image_generic.sh：补回 4096 MiB rootfs_data 分区 ----------
