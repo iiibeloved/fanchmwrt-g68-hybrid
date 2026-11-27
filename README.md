@@ -244,7 +244,12 @@ build ──► feed-pin 固定提交 → feed-sources 固定同名包来源
 | `uboot-check` | 独立编译 u-boot，验证 MaskROM 链路（源码 / 投递 / 产物三层） |
 | `build` | 固定 feed、defconfig 归一化、依赖守卫、全量编译、产物校验、发布 Release、回写 `upstream.lock` |
 
-触发方式：`push`（配置变更）、`workflow_dispatch`（手动）、`upstream-watch`（上游变化自动触发）。仓库为 public，CI 免费额度充足。
+触发方式：
+- `upstream-watch`：每小时比对上游 commit，一有更新立即触发全量构建发布（跟随上游的主力机制）。
+- `schedule`：**每周三 02:00 CST**（UTC 周二 18:00）定点检查；仅在上游有更新时构建发版，无变化则跳过，不产生空 Release。
+- `push`（device/configs/scripts/workflow 变更）、`workflow_dispatch`（手动）。
+
+仓库为 public，CI 免费额度充足。
 
 ### 10.4 仓库结构
 
@@ -273,7 +278,9 @@ scripts/
   build.yml / maskrom-guard.yml / package-guard.yml / upstream-watch.yml
 ```
 
-### 10.5 不变量（任何改动都不得破坏）
+### 10.5 不变量（跟随上游更新时同样固定不变）
+
+**跟随上游只拉取 FanchmWrt 官方源码；设备层与全部守卫脚本都来自本仓固定文件，不随上游变动。** 上游一旦改动内核补丁栈 / U-Boot 调用点 / 文件结构而使任一守卫失配，CI 在 `prepare` 阶段就 fail-fast，**绝不产出削弱核心功能的 Release**——即"跟随的是功能更新，不是守卫退化"。任何改动（含上游同步）都不得破坏以下各条：
 
 1. 长按 Reset → MaskROM 链路可用（三层守卫通过，含 2025.10 `board.c` 调用点）；
 2. 网络生命线 swconfig / rtl8367b / dnsmasq-full 齐全，910/913/915 补丁零 fuzz 生效；
